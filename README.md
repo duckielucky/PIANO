@@ -10,11 +10,12 @@ npm run dev
 
 Open http://localhost:5186. On a phone on the same Wi-Fi, use your computer's LAN IP with port 5186. The published Sites URL also works directly on iPhone.
 
-- Touch: tap a lane at the glowing line; hold green notes until their tail arrives; drag in the arrow direction for swipes.
-- Keyboard: **D F J K**. Hold the corresponding lane key and press **Left / Right** for a swipe.
+- Touch: tap a lane at the glowing line; hold green notes until their tail arrives.
+- Keyboard: **D F J K**. Keep the lane key pressed for green holds.
 - **Esc** pauses. Switching tabs automatically pauses the track.
 - Three original procedural soundtracks, three difficulty levels, local personal bests, results, and replay.
-- Chill mode includes taps and holds only.
+- All modes use taps and holds only. Chill is the default, with slower notes, half as many notes as before, one-beat holds, generous timing, and no game over. The starting track is the slower Afterglow.
+- Scores use a separate tap-and-hold record so old, denser charts do not set an unreachable personal best.
 
 Music starts after a user gesture, as required by mobile browsers. Audio and note positions use the same AudioContext clock. Wired headphones or speakers avoid Bluetooth audio delay. Browser preview was checked at iPhone dimensions; physical iPhone hardware was not available for testing.
 

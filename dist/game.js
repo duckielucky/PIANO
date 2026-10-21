@@ -4,14 +4,14 @@ import { Soundtrack } from './audio.js';
 const $ = s => document.querySelector(s);
 const canvas=$('#canvas'), ctx=canvas.getContext('2d'), stage=$('#stage'), modal=$('#modal');
 const audio = new Soundtrack();
-let track = TRACKS[0], difficulty='normal', mode='menu', run=null;
+let track = TRACKS[1], difficulty='easy', mode='menu', run=null;
 let width=390,height=550,dpr=1, lastFrame=0, flashes=[0,0,0,0], particles=[], pointers=new Map(), keys=new Set();
 let dialogType='', session=0;
 let lastScore=-1,lastCombo=-1,lastEnergy=-1;
 const reducedMotion=matchMedia('(prefers-reduced-motion: reduce)').matches;
-const travel=()=>difficulty==='hard'?1.45:difficulty==='easy'?2.55:2.05;
+const travel=()=>difficulty==='hard'?2.2:difficulty==='easy'?3.25:2.75;
 const duration=()=>track.bars*4*60/track.bpm;
-const bestKey=()=>`neon-rush-best-${track.id}-${difficulty}`;
+const bestKey=()=>`neon-rush-tap-hold-best-${track.id}-${difficulty}`;
 function readBest(){try{return Number(localStorage.getItem(bestKey()))||0;}catch{return 0;}}
 function saveBest(score){try{localStorage.setItem(bestKey(),String(score));}catch{}}
 const format=n=>Math.round(n).toString().padStart(7,'0');
@@ -20,7 +20,7 @@ function setTrack(next){
   const sec=Math.round(duration());$('#trackDetail').textContent=`NEON ORIGINALS · ${String(Math.floor(sec/60)).padStart(2,'0')}:${String(sec%60).padStart(2,'0')}`;
   $('#best').textContent=format(readBest());
 }
-function setDifficulty(value){difficulty=value;$('#difficultyLabel').textContent=({easy:'CHILL',normal:'NORMAL',hard:'EXPERT'})[value];document.querySelectorAll('[data-difficulty]').forEach(b=>{const active=b.dataset.difficulty===value;b.classList.toggle('selected',active);b.setAttribute('aria-pressed',String(active));});$('#best').textContent=format(readBest());}
+function setDifficulty(value){difficulty=value;$('#energyLabel').textContent=value==='easy'?'PRACTICE · NO FAIL':'ENERGY';$('#modeHint').textContent=value==='easy'?'TAP + HOLD · SLOW PACE · NO FAIL':'TAP + HOLD · FOLLOW THE BEAT';$('#difficultyLabel').textContent=({easy:'CHILL',normal:'NORMAL',hard:'EXPERT'})[value];document.querySelectorAll('[data-difficulty]').forEach(b=>{const active=b.dataset.difficulty===value;b.classList.toggle('selected',active);b.setAttribute('aria-pressed',String(active));});$('#best').textContent=format(readBest());}
 function resize(){const r=stage.getBoundingClientRect();width=r.width;height=r.height;dpr=Math.min(devicePixelRatio||1,2);canvas.width=Math.round(width*dpr);canvas.height=Math.round(height*dpr);ctx.setTransform(dpr,0,0,dpr,0,0);}
 new ResizeObserver(resize).observe(stage);
 
@@ -69,11 +69,7 @@ function noteBlock(note,f,holding=false){
   const face=ctx.createLinearGradient(0,p.y-nh,0,p.y+nh);face.addColorStop(0,green?'#e3ffad':'#b7ffff');face.addColorStop(.25,color);face.addColorStop(.6,green?'#8dcc36':'#259cb8');face.addColorStop(1,green?'#c5ff69':'#71edfa');
   polygon([{x:p.x-nw*.45,y:p.y-nh/2},{x:p.x+nw*.45,y:p.y-nh/2},{x:p.x+nw/2,y:p.y+nh/2},{x:p.x-nw/2,y:p.y+nh/2}],face,color);
   ctx.shadowBlur=0;line({x:p.x-nw*.38,y:p.y-nh*.18},{x:p.x+nw*.38,y:p.y-nh*.18},'#ffffffa0',1);
-  if(note.type==='swipe'){
-    const arrowWidth=nw*.45,dir=note.direction;const x=p.x+nw*.28*dir,y=p.y-nh*1.4;
-    ctx.shadowColor=color;ctx.shadowBlur=8;line({x:x-arrowWidth*.3*dir,y},{x:x+arrowWidth*.55*dir,y},color,2);
-    line({x:x+arrowWidth*.55*dir,y},{x:x+arrowWidth*.25*dir,y:y-4*p.p},color,2);line({x:x+arrowWidth*.55*dir,y},{x:x+arrowWidth*.25*dir,y:y+4*p.p},color,2);ctx.shadowBlur=0;
-  }
+
 }
 function burst(lane,color='#65edfa'){
   flashes[lane]=1;const p=project(1,(lane+.5)/4);
@@ -97,7 +93,7 @@ async function start(){
   const token=++session; closeModal();$('#playButton').disabled=true;
   try{await audio.unlock();}catch(e){$('#playButton').disabled=false;showError('Audio could not start. Tap play again to enable your browser’s audio.');return;}
   if(token!==session)return;
-  run=new Run(makeChart(track,difficulty));lastScore=lastCombo=lastEnergy=-1;keys.clear();pointers.clear();particles=[];
+  run=new Run(makeChart(track,difficulty),difficulty);lastScore=lastCombo=lastEnergy=-1;keys.clear();pointers.clear();particles=[];
   audio.start(track);mode='countdown';$('#menu').hidden=true;$('#pauseButton').disabled=false;$('#nextTrack').hidden=true;$('#trackButton').disabled=true;$('#playingBars').hidden=false;$('#countdown').hidden=false;$('#playButton').disabled=false;$('#songProgress').style.width='0%';updateHUD();
 }
 function showError(message){dialogType='error';$('#modalContent').innerHTML=`<div class="eyebrow">LET’S TRY THAT AGAIN</div><h2>ONE MORE BEAT.</h2><p>${message}</p><button class="primary-button" data-action="close">GOT IT</button>`;modal.showModal();}
@@ -112,18 +108,12 @@ function press(lane){
 function release(lane){
   if(mode!=='playing'||isLaneDown(lane))return;
   const n=run.notes.find(n=>n.lane===lane&&n.status==='holding');
-  if(n)judge(n,audio.time>=n.time+n.duration-.11?n.holdGrade:'miss',n.error);
-}
-function swipe(lane,direction){
-  if(mode!=='playing')return false;
-  const t=audio.time,n=run.candidate(lane,t,true);if(!n||n.direction!==direction)return false;
-  judge(n,gradeTiming(t-n.time),t-n.time);return true;
+  if(n)judge(n,audio.time>=n.time+n.duration-.22?n.holdGrade:'miss',n.error);
 }
 $('#laneInputs').addEventListener('pointerdown',e=>{
   const button=e.target.closest('[data-lane]');if(!button||mode!=='playing')return;e.preventDefault();
-  const lane=Number(button.dataset.lane);button.setPointerCapture(e.pointerId);pointers.set(e.pointerId,{lane,x:e.clientX,y:e.clientY,swiped:false});press(lane);
+  const lane=Number(button.dataset.lane);button.setPointerCapture(e.pointerId);pointers.set(e.pointerId,{lane});press(lane);
 });
-$('#laneInputs').addEventListener('pointermove',e=>{const p=pointers.get(e.pointerId);if(!p||p.swiped)return;const dx=e.clientX-p.x;if(Math.abs(dx)>18&&Math.abs(dx)>Math.abs(e.clientY-p.y)){p.swiped=swipe(p.lane,Math.sign(dx));}});
 function pointerEnd(e){const p=pointers.get(e.pointerId);if(p){pointers.delete(e.pointerId);release(p.lane);}}
 $('#laneInputs').addEventListener('pointerup',pointerEnd);$('#laneInputs').addEventListener('pointercancel',pointerEnd);$('#laneInputs').addEventListener('lostpointercapture',pointerEnd);
 const keyLanes={KeyD:0,KeyF:1,KeyJ:2,KeyK:3};
@@ -131,10 +121,7 @@ window.addEventListener('keydown',e=>{
   if(e.code==='Escape'){e.preventDefault();if(mode==='playing'||mode==='countdown')pause();else if(mode==='paused')resume();return;}
   if(e.code==='Space'&&!modal.open){e.preventDefault();if(mode==='menu'||mode==='results')start();return;}
   if(e.code in keyLanes){e.preventDefault();if(e.repeat)return;const l=keyLanes[e.code];keys.add(l);press(l);}
-  if(e.code==='ArrowLeft'||e.code==='ArrowRight'){
-    if(mode!=='playing'||e.repeat)return;e.preventDefault();const dir=e.code==='ArrowLeft'?-1:1;
-    const n=run.notes.find(n=>n.status==='pending'&&n.type==='swipe'&&n.direction===dir&&keys.has(n.lane)&&gradeTiming(n.time-audio.time));if(n)swipe(n.lane,dir);
-  }
+
 });
 window.addEventListener('keyup',e=>{if(e.code in keyLanes){const l=keyLanes[e.code];keys.delete(l);release(l);}});
 async function pause(){
@@ -161,7 +148,7 @@ function finish(reason='complete'){
 }
 function closeModal(){if(modal.open)modal.close();dialogType='';}
 function help(){
-  dialogType='help';$('#modalContent').innerHTML='<div class="eyebrow">THE BASICS</div><h2>FOLLOW<br><em>THE FEELING.</em></h2><div class="tutorial-row"><span class="note-icon tap"></span><div><strong>TAP THE BLUE NOTES</strong><p>Tap a lane when the note reaches the glowing line at the bottom.</p></div></div><div class="tutorial-row"><span class="note-icon hold"></span><div><strong>HOLD THE GREEN NOTES</strong><p>Keep your finger down until the glowing tail reaches the line.</p></div></div><div class="tutorial-row"><span class="note-icon swipe">→</span><div><strong>SWIPE THE ARROWS</strong><p>Touch the lane and slide left or right as the arrow reaches the line.</p></div></div><p class="key-hint">Keyboard: <b>D F J K</b> for lanes. For swipes, hold the lane key and press <b>← / →</b>. <b>Esc</b> to pause.</p><p class="key-hint">Chill mode has taps and holds only. Use speakers or wired headphones for the tightest timing.</p><button class="primary-button" data-action="close">I’VE GOT THE RHYTHM <span>↗</span></button>';modal.showModal();
+  dialogType='help';$('#modalContent').innerHTML='<div class="eyebrow">THE BASICS</div><h2>FOLLOW<br><em>THE FEELING.</em></h2><div class="tutorial-row"><span class="note-icon tap"></span><div><strong>TAP THE BLUE NOTES</strong><p>Tap a lane when the note reaches the glowing line at the bottom.</p></div></div><div class="tutorial-row"><span class="note-icon hold"></span><div><strong>HOLD THE GREEN NOTES</strong><p>Keep your finger down until the glowing tail reaches the line.</p></div></div><p class="key-hint">Keyboard: <b>D F J K</b> for lanes. <b>Esc</b> to pause.</p><p class="key-hint">Start with Chill: fewer notes, shorter holds, and no game over. You can finish the whole song while you learn.</p><button class="primary-button" data-action="close">I’VE GOT THE RHYTHM <span>↗</span></button>';modal.showModal();
 }
 function trackMenu(){
   if(mode!=='menu')return;dialogType='tracks';$('#modalContent').innerHTML='<div class="eyebrow">NEON ORIGINALS</div><h2>PICK YOUR<br><em>FREQUENCY.</em></h2>'+TRACKS.map(t=>`<button class="track-choice ${t===track?'selected':''}" data-track="${t.id}"><strong>${t.title} ${t===track?'↗':''}</strong><span>${t.bpm} BPM · ${t.mood}</span></button>`).join('')+'<button class="primary-button" data-action="close">LET’S GO <span>↗</span></button>';modal.showModal();
@@ -186,7 +173,7 @@ function frame(now){
     // A slow-moving preview gives the menu the same spatial feel as gameplay.
     for(let i=0;i<9;i++){
       const f=((i*.143+(reducedMotion?0:now*.000018))%.96);
-      const n={lane:[0,3,1,2,0,2,3,1,2][i],type:i===2||i===7?'hold':i===4?'swipe':'tap',duration:.5,direction:1};noteBlock(n,f);
+      const n={lane:[0,3,1,2,0,2,3,1,2][i],type:i===2||i===7?'hold':'tap',duration:.5};noteBlock(n,f);
     }
   }else if(run){
     if(playing){
@@ -200,7 +187,7 @@ function frame(now){
         }
       }
       $('#songProgress').style.width=Math.max(0,Math.min(100,t/duration()*100))+'%';
-      if(run.energy<=0)finish('energy');else if(t>=duration()+.3)finish();
+      if(run.failed)finish('energy');else if(t>=duration()+.3)finish();
     }
     // Draw distant notes first, near notes last, including hold tails.
     for(let i=run.notes.length-1;i>=0;i--){const n=run.notes[i];if(n.status==='hit'||n.status==='miss')continue;const f=1-(n.time-t)/travel();if(n.status==='holding'){const remaining=n.time+n.duration-t;noteBlock({...n,duration:Math.max(0,remaining)},1,true);}else noteBlock(n,f);}
