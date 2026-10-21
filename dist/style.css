@@ -6,3 +6,32 @@
 @media(prefers-reduced-motion:reduce){.playing-bars i{animation:none}.judgment.show{animation-duration:.15s}}
 
 .practice-tip{margin-top:30px;border-top:1px solid #ffffff12;padding-top:20px}.practice-tip strong{font-size:8px;letter-spacing:1.5px;color:var(--lime)}.practice-tip p{font-size:11px;line-height:1.7;color:#697186}
+
+/* Motion accents keep the note highway readable. */
+.menu-title{margin:17px 0 23px;display:flex;flex-direction:column;gap:2px}
+.menu-title span{font:700 23px 'Barlow Condensed',sans-serif;letter-spacing:3px;color:#b8c1d8;animation:menu-in .55s ease-out both}
+.menu-title em{font-size:68px;line-height:.95;letter-spacing:-1px;animation:menu-in .65s .1s ease-out both}
+.menu-overlay .difficulty-selector{animation:menu-in .6s .18s ease-out both}
+#playButton{overflow:hidden;animation:button-breathe 3s ease-in-out infinite}
+#playButton::after{content:'';position:absolute;inset:-50% auto -50% -70%;width:35%;transform:skew(-22deg);background:linear-gradient(90deg,transparent,#ffffff70,transparent);animation:button-sheen 4.5s ease-in-out infinite;pointer-events:none}
+#playButton .button-arrow{animation:arrow-drift 2.5s ease-in-out infinite}
+body[data-state="menu"] .mini-disc{animation:disc-turn 18s linear infinite}
+body[data-state="playing"] .mini-disc{animation:disc-turn 5s linear infinite}
+body[data-state="playing"] .track-art svg{animation:art-float 2s ease-in-out infinite}
+body[data-state="paused"] .mini-disc,body[data-state="paused"] .track-art svg{animation-play-state:paused}
+.track-art{transition:border-color .25s,box-shadow .25s}.track-art:hover{border-color:var(--lime);box-shadow:0 0 18px #c5ff6925}
+.scoreboard strong,.combo strong{transform-origin:center center}
+dialog[open]{animation:modal-in .22s ease-out}
+.note-demo{width:45px;height:44px;position:relative;border-bottom:1px solid #65edfa88;flex-shrink:0;overflow:hidden;background:linear-gradient(transparent,#65edfa08)}
+.note-demo .note-icon{display:block;position:absolute;left:4px;top:11px;animation:demo-note 2s ease-in-out infinite}
+.note-demo .hold{animation-delay:.4s}
+@keyframes menu-in{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+@keyframes button-breathe{0%,100%{box-shadow:0 4px 20px #c5ff691a}50%{box-shadow:0 4px 32px #c5ff6945}}
+@keyframes button-sheen{0%,40%{left:-70%}75%,100%{left:150%}}
+@keyframes arrow-drift{0%,100%{transform:translate(0,0)}50%{transform:translate(2px,-2px)}}
+@keyframes disc-turn{to{transform:rotate(360deg)}}
+@keyframes art-float{50%{transform:translateY(-2px) scale(1.06)}}
+@keyframes modal-in{from{opacity:0;transform:translateY(12px) scale(.97)}to{opacity:1;transform:none}}
+@keyframes demo-note{0%{transform:translateY(-24px);opacity:0}20%{opacity:1}70%,85%{transform:translateY(25px);opacity:1}100%{transform:translateY(25px);opacity:0}}
+@media(max-height:730px){.menu-title{margin:12px 0 17px}.menu-title em{font-size:56px}.menu-title span{font-size:21px}}
+@media(prefers-reduced-motion:reduce){.menu-title span,.menu-title em,.menu-overlay .difficulty-selector,#playButton,#playButton::after,#playButton .button-arrow,.mini-disc,.track-art svg,dialog[open],.note-demo .note-icon{animation:none!important}}

@@ -11,13 +11,13 @@
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="style.css">
 </head>
-<body>
+<body data-state="menu">
   <div class="desktop-brand"><span class="brand-mark">N<span>↗</span></span><span>NEON RUSH<span class="brand-caption">THE RHYTHM IS YOURS.</span></span></div>
-  <aside class="side-copy"><div class="eyebrow"><i></i> RHYTHM ARCADE / VOL. 01</div><h1>Find your<br>frequency<span>.</span></h1><p>Four lanes. One rhythm.<br>Get out of your head and into the flow.</p><div class="side-rule"></div><div class="key-guide"><kbd>D</kbd><kbd>F</kbd><kbd>J</kbd><kbd>K</kbd></div><span class="quiet">PLAY WITH YOUR KEYBOARD<br>OR TAP ON YOUR PHONE</span><div class="side-bottom">BUILT FOR THE BEAT.<span>01 — 03</span></div></aside>
+  <aside class="side-copy"><div class="eyebrow"><i></i> RHYTHM ARCADE / VOL. 01</div><h1>Find your<br>frequency<span>.</span></h1><div class="side-rule"></div><div class="key-guide"><kbd>D</kbd><kbd>F</kbd><kbd>J</kbd><kbd>K</kbd></div><span class="quiet">KEYBOARD / TOUCH</span><div class="side-bottom">BUILT FOR THE BEAT.<span>01 — 03</span></div></aside>
   <main class="phone" id="game" aria-label="Neon Rush rhythm game">
     <header class="game-header"><a class="wordmark" href="./" aria-label="Neon Rush home">NEON<span>RUSH</span><span class="small-star">✦</span></a><div class="header-actions"><button class="icon-button" id="soundButton" aria-label="Mute sound" title="Mute sound"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m11 5-6 4H2v6h3l6 4zM15 8a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14"/></svg></button><button class="icon-button" id="pauseButton" aria-label="Pause game" title="Pause (Esc)" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14M16 5v14"/></svg></button></div></header>
     <section class="scoreboard" aria-label="Live score"><div><span class="label">SCORE</span><strong id="score">0000000</strong></div><div class="best-score"><span class="label">PERSONAL BEST <span>↗</span></span><strong id="best">0000000</strong></div></section>
-    <div class="energy"><div id="energyFill"></div><span id="energyLabel">PRACTICE · NO FAIL</span><b id="energyText">100%</b></div>
+    <div class="energy"><div id="energyFill"></div><span id="energyLabel">NO FAIL</span><b id="energyText">100%</b></div>
     <section class="stage" id="stage" aria-label="Four note lanes. Tap when notes reach the glowing line.">
       <canvas id="canvas" aria-label="Notes travel down four lanes. Use D, F, J, K, or touch the lanes." role="img"></canvas>
       <div class="stage-meta"><span><i></i> <span id="difficultyLabel">CHILL</span></span><span id="bpmLabel">110 BPM</span></div>
@@ -25,18 +25,18 @@
       <div id="judgment" class="judgment" aria-live="off"></div>
       <div class="lane-inputs" id="laneInputs"><button aria-label="Lane 1, D key" data-lane="0"><span>D</span></button><button aria-label="Lane 2, F key" data-lane="1"><span>F</span></button><button aria-label="Lane 3, J key" data-lane="2"><span>J</span></button><button aria-label="Lane 4, K key" data-lane="3"><span>K</span></button></div>
       <div class="menu-overlay" id="menu">
-        <div class="ready-chip"><span></span> <span id="modeHint">TAP + HOLD · SLOW PACE · NO FAIL</span></div>
-        <h2>FEEL THE<br><em>FREQUENCY.</em></h2><p class="menu-description">Tap the beat. Hold the glow. Find your flow.</p>
+        <div class="ready-chip"><span></span> <span id="modeHint">NO FAIL</span></div>
+        <h2 class="menu-title"><span>TAP. HOLD.</span><em>FLOW.</em></h2>
         <div class="difficulty-selector" role="group" aria-label="Difficulty"><button class="selected" data-difficulty="easy" aria-pressed="true">CHILL</button><button data-difficulty="normal">NORMAL</button><button data-difficulty="hard">EXPERT</button></div>
-        <button class="primary-button" id="playButton"><span class="play-icon">▶</span> LET’S PLAY <span class="button-arrow">↗</span></button>
-        <button class="text-button" id="helpButton">HOW TO PLAY <span>?</span></button>
+        <button class="primary-button" id="playButton"><span class="play-icon">▶</span> PLAY <span class="button-arrow">↗</span></button>
+        <button class="text-button" id="helpButton">HELP <span>?</span></button>
       </div>
       <div class="countdown" id="countdown" hidden></div>
     </section>
-    <footer class="track-footer"><button class="track-art" id="trackButton" aria-label="Change track"><svg viewBox="0 0 48 48" aria-hidden="true"><path d="M5 30 17 7 25 29 34 12 43 30 32 39 16 38Z"/><path d="m5 30 20-1 7 10M17 7l-1 31m18-26-9 17 18 1"/></svg></button><div class="track-info"><span class="label">NOW SELECTED <i></i></span><strong id="trackName">Afterglow</strong><span id="trackDetail">NEON ORIGINALS · 00:52</span></div><button class="next-track icon-button" id="nextTrack" aria-label="Select next track" title="Next track">⌃<span>⌄</span></button><div class="playing-bars" id="playingBars" hidden><i></i><i></i><i></i><i></i></div></footer><div class="song-progress"><div id="songProgress"></div></div>
+    <footer class="track-footer"><button class="track-art" id="trackButton" aria-label="Change track"><svg viewBox="0 0 48 48" aria-hidden="true"><path d="M5 30 17 7 25 29 34 12 43 30 32 39 16 38Z"/><path d="m5 30 20-1 7 10M17 7l-1 31m18-26-9 17 18 1"/></svg></button><div class="track-info"><strong id="trackName">Afterglow</strong><span id="trackDetail">110 BPM · 00:52</span></div><button class="next-track icon-button" id="nextTrack" aria-label="Select next track" title="Next track">⌃<span>⌄</span></button><div class="playing-bars" id="playingBars" hidden><i></i><i></i><i></i><i></i></div></footer><div class="song-progress"><div id="songProgress"></div></div>
     <dialog id="modal"><div id="modalContent"></div></dialog>
   </main>
-  <aside class="right-copy"><div class="mini-disc"><div></div></div><span class="eyebrow">SOUND ON. WORLD OFF.</span><div class="mechanic"><span class="note-icon tap"></span><div><strong>TAP</strong><p>Hit it on the line.</p></div></div><div class="mechanic"><span class="note-icon hold"></span><div><strong>HOLD</strong><p>Stay with the sound.</p></div></div><div class="practice-tip"><strong>TAKE YOUR TIME.</strong><p>Start on Chill. Fewer notes.<br>More room to find the beat.</p></div><div class="right-foot"><span class="green-dot"></span> ORIGINAL MUSIC. INSTANT PLAY.</div></aside>
+  <aside class="right-copy"><div class="mini-disc"><div></div></div><span class="eyebrow">SOUND ON. WORLD OFF.</span><div class="mechanic"><span class="note-icon tap"></span><div><strong>TAP</strong></div></div><div class="mechanic"><span class="note-icon hold"></span><div><strong>HOLD</strong></div></div></aside>
   <div class="desktop-footer"><span>HEADPHONES RECOMMENDED</span><span>PORTRAIT MODE / 4 LANES</span><button id="fullscreenButton" aria-label="Toggle fullscreen">FULLSCREEN <span>⛶</span></button></div>
   <script type="module" src="game.js"></script>
 </body>
