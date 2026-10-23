@@ -1,4 +1,4 @@
-# Neon Rush
+# VIPERMIX
 
 A playable, landscape-first rhythm game inspired by classic four-lane mobile rhythm games. Built with Canvas 2D, Web Audio, and plain JavaScript.
 
@@ -28,4 +28,6 @@ npm run check
 
 Tests cover timing windows, chart playability for all tracks and difficulties, score/accuracy calculation, duplicate judgment prevention, and hold completion/early release.
 
-Source files live in `dist/` and require no build step. Music and game art are generated in code; no audio or artwork from the reference game is used. The visual theme uses the supplied deep-purple gradient (#150927 to #100a21), ViperMix-inspired violet/blue controls, blue taps, purple holds, and system sans-serif fonts.
+Source files live in `dist/` and require no build step. Music and note effects are generated in code. VIPERMIX’s logo and favicon come from vipermix.cc. The visual theme uses the supplied deep-purple gradient (#150927 to #100a21), ViperMix-inspired violet/blue controls, blue taps, purple holds, and system sans-serif fonts.
+
+The English / 简体中文 toggle works on the game, rotation prompt, and dialogs. Language preference is saved locally; first-time visitors use their browser language. Existing score records remain compatible.

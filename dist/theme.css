@@ -1,6 +1,6 @@
 /* ViperMix-inspired finish. Background sampled from the supplied swatch. */
 :root {
-  --ui: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --ui: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
   --ink: #120a24;
   --panel: #1c1234;
   --white: #faf8ff;
@@ -74,3 +74,28 @@ dialog .secondary-button:hover {background:#9c5af726}
 @media(orientation:landscape) and (max-height:540px) {body{background:linear-gradient(180deg,#150927,#100a21)}.phone{box-shadow:none}.menu-title{margin:13px 0 17px}.menu-title em{font-size:43px}.menu-title span{font-size:12px}.ready-chip{padding:5px 9px}.scoreboard strong{font-size:21px}.best-score strong{font-size:14px}.text-button{font-size:8px}dialog h2{font-size:27px;letter-spacing:-1px}.result-grade{font-size:38px}}
 @media(orientation:landscape) and (max-height:350px) {.menu-title em{font-size:35px}.menu-title{margin:8px 0 11px}.ready-chip{padding:4px 8px}}
 @media(max-width:600px) and (orientation:portrait) {.portrait-fallback .menu-overlay{background:linear-gradient(0deg,#100a21 0%,#120a24ee 28%,#15092788 57%,transparent 85%)}.portrait-fallback .menu-title em{font-size:62px}.portrait-fallback .menu-title span{font-size:17px}}
+
+/* VIPERMIX identity and a persistent English / 简体中文 selector. */
+.wordmark {display:flex;align-items:center;gap:8px;flex-shrink:0}
+.brand-logo {display:block;width:59px;height:33px;object-fit:contain}
+.brand-name {font-size:18px;font-weight:800;letter-spacing:-.5px}
+.brand-name>span {background:var(--brand-gradient);background-clip:text;-webkit-background-clip:text;color:transparent}
+.language-button {min-width:42px;height:32px;padding:0 9px;background:#9c5af712;border:1px solid #ac88ff45;border-radius:10px;color:#e4d7fa;font:600 11px var(--ui);letter-spacing:.2px;white-space:nowrap;cursor:pointer}
+.language-button:hover {background:#9c5af72b}
+.orientation-language {position:absolute;top:calc(20px + env(safe-area-inset-top));right:24px}
+.dialog-language {display:flex;justify-content:flex-end;margin-bottom:4px}
+.dialog-language .language-button {height:28px;min-width:40px}
+.best-score .label [data-i18n] {color:inherit;padding-left:0}
+.text-button .button-label {display:inline;width:auto;height:auto;border:0;border-radius:0;font:inherit;margin:0}
+html[lang="zh-CN"] .menu-title em {font-size:38px;letter-spacing:1px;line-height:1.2}
+html[lang="zh-CN"] .menu-title span {letter-spacing:2px}
+html[lang="zh-CN"] .label,html[lang="zh-CN"] .stage-meta,html[lang="zh-CN"] .energy span,html[lang="zh-CN"] .ready-chip {font-size:9px;letter-spacing:1px}
+html[lang="zh-CN"] .difficulty-selector button {font-size:11px;letter-spacing:1px}
+html[lang="zh-CN"] .text-button {font-size:11px;letter-spacing:1px}
+html[lang="zh-CN"] .primary-button {font-size:13px;letter-spacing:2px}
+html[lang="zh-CN"] h2 {letter-spacing:1px}
+html[lang="zh-CN"] .judgment {letter-spacing:3px}
+html[lang="zh-CN"] .result-stats span,html[lang="zh-CN"] .result-best {font-size:10px}
+@media(max-width:1000px) {html[lang="zh-CN"] .menu-title em{font-size:29px}.wordmark{gap:5px}.brand-logo{width:51px;height:29px}.brand-name{font-size:16px}}
+@media(orientation:landscape) and (max-height:540px) {.dialog-language{margin-bottom:0}.dialog-language .language-button{height:24px}dialog h2{margin-top:0}html[lang="zh-CN"] .menu-title em{font-size:29px}html[lang="zh-CN"] .menu-title span{font-size:13px}.header-actions{gap:7px}}
+@media(max-width:600px) and (orientation:portrait) {.portrait-fallback .game-header{padding-inline:16px}.brand-logo{width:44px;height:25px}.brand-name{font-size:15px}.header-actions{gap:6px}.language-button{min-width:38px;padding-inline:7px}html[lang="zh-CN"] .portrait-fallback .menu-title em{font-size:44px}}

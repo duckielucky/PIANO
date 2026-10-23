@@ -1,9 +1,41 @@
 import { TRACKS, WINDOWS, makeChart, gradeTiming, gradeAccuracy, Run } from './engine.js';
 import { Soundtrack } from './audio.js';
+import { chooseLanguage, translate } from './i18n.js?v=f77b9901f2';
 
 const $ = s => document.querySelector(s);
 const canvas=$('#canvas'), ctx=canvas.getContext('2d'), stage=$('#stage'), modal=$('#modal');
 const audio = new Soundtrack();
+let savedLanguage;
+try { savedLanguage=localStorage.getItem('vipermix-language'); } catch {}
+let language=chooseLanguage(savedLanguage,navigator.language), lastResult=null;
+const t=(key,values)=>translate(language,key,values);
+const trackTitle=track=>t('track_'+track.id);
+function updateLanguageButtons(){
+  document.querySelectorAll('[data-language-toggle]').forEach(button=>{
+    button.textContent=t('switchLabel');button.setAttribute('aria-label',t('switchLanguage'));
+    button.title=t('switchLanguage');button.lang=language==='en'?'zh-CN':'en';
+  });
+}
+function syncSoundLabel(){const label=t(audio.muted?'unmute':'mute');$('#soundButton').setAttribute('aria-label',label);$('#soundButton').title=label;}
+function applyLanguage(){
+  document.documentElement.lang=language==='zh'?'zh-CN':'en';
+  document.title=t('title');document.querySelector('meta[name="description"]').content=t('description');
+  document.querySelectorAll('[data-i18n]').forEach(el=>{el.textContent=t(el.dataset.i18n);});
+  document.querySelectorAll('[data-i18n-aria]').forEach(el=>el.setAttribute('aria-label',t(el.dataset.i18nAria)));
+  document.querySelectorAll('[data-i18n-title]').forEach(el=>{el.title=t(el.dataset.i18nTitle);});
+  document.querySelectorAll('[data-lane]').forEach(el=>el.setAttribute('aria-label',t('lane',{number:Number(el.dataset.lane)+1,key:['D','F','J','K'][Number(el.dataset.lane)]})));
+  setTrack(track);setDifficulty(difficulty);syncSoundLabel();
+  if($('#judgment').dataset.result)$('#judgment').textContent=t($('#judgment').dataset.result);
+  if(modal.open)renderDialog();
+  updateLanguageButtons();
+}
+function toggleLanguage(event){
+  const button=event.target.closest('[data-language-toggle]');if(!button)return;
+  const inDialog=modal.contains(button);language=language==='en'?'zh':'en';
+  try{localStorage.setItem('vipermix-language',language);}catch{}
+  applyLanguage();if(inDialog)modal.querySelector('[data-language-toggle]').focus();
+}
+document.addEventListener('click',toggleLanguage);
 let track = TRACKS[1], difficulty='easy', mode='menu', run=null;
 let width=390,height=550,dpr=1, lastFrame=0, flashes=[0,0,0,0], particles=[], ripples=[], pointers=new Map(), keys=new Set();
 let dialogType='', session=0, allowPortrait=false;
@@ -26,11 +58,11 @@ function readBest(){try{return Number(localStorage.getItem(bestKey()))||0;}catch
 function saveBest(score){try{localStorage.setItem(bestKey(),String(score));}catch{}}
 const format=n=>Math.round(n).toString().padStart(7,'0');
 function setTrack(next){
-  track=next;$('#trackName').textContent=track.title;$('#bpmLabel').textContent=track.bpm+' BPM';
+  track=next;$('#trackName').textContent=trackTitle(track);$('#bpmLabel').textContent=track.bpm+' BPM';
   const sec=Math.round(duration());$('#trackDetail').textContent=`${track.bpm} BPM · ${String(Math.floor(sec/60)).padStart(2,'0')}:${String(sec%60).padStart(2,'0')}`;
   $('#best').textContent=format(readBest());
 }
-function setDifficulty(value){difficulty=value;$('#energyLabel').textContent=value==='easy'?'NO FAIL':'ENERGY';$('#modeHint').textContent=value==='easy'?'NO FAIL':'TAP + HOLD';$('#difficultyLabel').textContent=({easy:'CHILL',normal:'NORMAL',hard:'EXPERT'})[value];document.querySelectorAll('[data-difficulty]').forEach(b=>{const active=b.dataset.difficulty===value;b.classList.toggle('selected',active);b.setAttribute('aria-pressed',String(active));});$('#best').textContent=format(readBest());}
+function setDifficulty(value){difficulty=value;$('#energyLabel').textContent=t(value==='easy'?'noFail':'energy');$('#modeHint').textContent=t(value==='easy'?'noFail':'tapHold');$('#difficultyLabel').textContent=t(value);document.querySelectorAll('[data-difficulty]').forEach(b=>{const active=b.dataset.difficulty===value;b.classList.toggle('selected',active);b.setAttribute('aria-pressed',String(active));});$('#best').textContent=format(readBest());}
 function resize(){const r=stage.getBoundingClientRect();width=r.width;height=r.height;dpr=Math.min(devicePixelRatio||1,2);canvas.width=Math.round(width*dpr);canvas.height=Math.round(height*dpr);ctx.setTransform(dpr,0,0,dpr,0,0);}
 new ResizeObserver(resize).observe(stage);
 
@@ -110,7 +142,7 @@ function burst(lane,color='#79b8ff'){
   for(let i=0;i<20;i++)particles.push({x:p.x,y:p.y,vx:(Math.random()-.5)*140,vy:-Math.random()*160-30,life:.45+Math.random()*.2,color});
 }
 function announce(result,lane){
-  const el=$('#judgment');el.textContent=result==='perfect'?'PERFECT':result==='great'?'GREAT':result==='good'?'GOOD':'MISS';
+  const el=$('#judgment');el.dataset.result=result;el.textContent=t(result);
   el.style.color=({perfect:'#c898ff',great:'#79b8ff',good:'#b6a1ff',miss:'#ff7b9f'})[result];
   el.classList.remove('show');void el.offsetWidth;el.classList.add('show');
   if(result!=='miss')burst(lane,result==='perfect'?'#c898ff':'#79b8ff');
@@ -124,12 +156,12 @@ function updateHUD(){
 }
 async function start(){
   const token=++session; closeModal();$('#playButton').disabled=true;
-  try{await audio.unlock();}catch(e){$('#playButton').disabled=false;showError('Audio could not start. Tap play again to enable your browser’s audio.');return;}
+  try{await audio.unlock();}catch(e){$('#playButton').disabled=false;showError();return;}
   if(token!==session)return;
   run=new Run(makeChart(track,difficulty),difficulty);lastScore=lastCombo=lastEnergy=-1;keys.clear();pointers.clear();particles=[];ripples=[];lastCountdown=null;
   audio.start(track);setMode('countdown');$('#menu').hidden=true;$('#pauseButton').disabled=false;$('#nextTrack').hidden=true;$('#trackButton').disabled=true;$('#playingBars').hidden=false;$('#countdown').hidden=false;$('#playButton').disabled=false;$('#songProgress').style.width='0%';updateHUD();
 }
-function showError(message){dialogType='error';$('#modalContent').innerHTML=`<div class="eyebrow">LET’S TRY THAT AGAIN</div><h2>ONE MORE BEAT.</h2><p>${message}</p><button class="primary-button" data-action="close">GOT IT</button>`;modal.showModal();}
+function showError(){showDialog('error');}
 function isLaneDown(lane){return keys.has(lane)||[...pointers.values()].some(p=>p.lane===lane);}
 function press(lane){
   if(mode!=='playing')return;
@@ -152,7 +184,7 @@ $('#laneInputs').addEventListener('pointerup',pointerEnd);$('#laneInputs').addEv
 const keyLanes={KeyD:0,KeyF:1,KeyJ:2,KeyK:3};
 window.addEventListener('keydown',e=>{
   if(e.code==='Escape'){e.preventDefault();if(mode==='playing'||mode==='countdown')pause();else if(mode==='paused')resume();return;}
-  if(e.code==='Space'&&!modal.open){e.preventDefault();if(mode==='menu'||mode==='results')start();return;}
+  if(e.code==='Space'&&!modal.open&&!e.target.closest('button,a,input,select')){e.preventDefault();if(mode==='menu'||mode==='results')start();return;}
   if(e.code in keyLanes){e.preventDefault();if(e.repeat)return;const l=keyLanes[e.code];keys.add(l);press(l);}
 
 });
@@ -160,7 +192,7 @@ window.addEventListener('keyup',e=>{if(e.code in keyLanes){const l=keyLanes[e.co
 async function pause(){
   if(mode!=='playing'&&mode!=='countdown')return;
   setMode('paused');keys.clear();pointers.clear();$('#countdown').hidden=true;$('#playingBars').classList.add('paused-bars');await audio.pause();
-  dialogType='pause';$('#modalContent').innerHTML='<h2><em>PAUSED.</em></h2><button class="primary-button" data-action="resume">RESUME <span>▶</span></button><button class="secondary-button" data-action="restart">RESTART</button><button class="secondary-button" data-action="home">MENU</button>';if(!modal.open)modal.showModal();
+  showDialog('pause');
 }
 async function resume(){
   if(mode!=='paused')return;
@@ -170,21 +202,30 @@ async function resume(){
   closeModal();setMode(audio.time<0?'countdown':'playing');$('#playingBars').classList.remove('paused-bars');
 }
 function goHome(){
-  session++;audio.stop();closeModal();setMode('menu');run=null;keys.clear();pointers.clear();$('#menu').hidden=false;$('#countdown').hidden=true;$('#comboBox').classList.remove('visible');$('#judgment').classList.remove('show');$('#pauseButton').disabled=true;$('#nextTrack').hidden=false;$('#trackButton').disabled=false;$('#playingBars').hidden=true;$('#playingBars').classList.remove('paused-bars');$('#score').textContent='0000000';$('#energyFill').style.width='100%';$('#energyFill').style.background='var(--brand-gradient)';$('#judgment').textContent='';$('#energyText').textContent='100%';$('#songProgress').style.width='0%';$('#best').textContent=format(readBest());
+  session++;audio.stop();closeModal();setMode('menu');run=null;keys.clear();pointers.clear();$('#menu').hidden=false;$('#countdown').hidden=true;$('#comboBox').classList.remove('visible');$('#judgment').classList.remove('show');$('#pauseButton').disabled=true;$('#nextTrack').hidden=false;$('#trackButton').disabled=false;$('#playingBars').hidden=true;$('#playingBars').classList.remove('paused-bars');$('#score').textContent='0000000';$('#energyFill').style.width='100%';$('#energyFill').style.background='var(--brand-gradient)';$('#judgment').textContent='';delete $('#judgment').dataset.result;$('#energyText').textContent='100%';$('#songProgress').style.width='0%';$('#best').textContent=format(readBest());
 }
 function finish(reason='complete'){
   if(mode==='results')return;setMode('results');audio.stop();$('#pauseButton').disabled=true;$('#playingBars').hidden=true;$('#comboBox').classList.remove('visible');
   const prev=readBest(),newBest=run.score>prev;if(newBest)saveBest(run.score);$('#best').textContent=format(readBest());
-  const accuracy=run.accuracy,grade=gradeAccuracy(accuracy);dialogType='results';
-  $('#modalContent').innerHTML=`<div class="eyebrow">${reason==='complete'?'TRACK COMPLETE':'OUT OF ENERGY'}</div><h2>${reason==='complete'?'NICE FLOW.':'ONE MORE TRY?'}</h2><div class="result-grade">${grade}</div><div class="result-score">${format(run.score)}</div><div class="result-best">${newBest?'↗ NEW PERSONAL BEST':track.title.toUpperCase()}</div><div class="result-stats"><div><strong>${accuracy.toFixed(1)}%</strong><span>ACCURACY</span></div><div><strong>${run.maxCombo}</strong><span>MAX COMBO</span></div></div><div class="result-breakdown"><span>${run.counts.perfect} PERFECT</span><span>${run.counts.great+run.counts.good} GOOD / GREAT</span><span>${run.counts.miss} MISS</span></div><button class="primary-button" data-action="restart">PLAY AGAIN <span>↗</span></button><button class="secondary-button" data-action="home">TRACKS</button>`;
-  if(!modal.open)modal.showModal();
+  const accuracy=run.accuracy,grade=gradeAccuracy(accuracy);
+  lastResult={reason,newBest,accuracy,grade};showDialog('results');
 }
 function closeModal(){if(modal.open)modal.close();dialogType='';}
-function help(){
-  dialogType='help';$('#modalContent').innerHTML='<h2>TAP <em>+ HOLD</em></h2><div class="tutorial-row"><div class="note-demo"><span class="note-icon tap"></span></div><div><strong>TAP</strong><p>Hit blue notes at the line.</p></div></div><div class="tutorial-row"><div class="note-demo"><span class="note-icon hold"></span></div><div><strong>HOLD</strong><p>Hold purple notes until the tail arrives.</p></div></div><p class="key-hint"><b>D F J K</b> · <b>Esc</b> to pause</p><button class="primary-button" data-action="close">GOT IT</button>';modal.showModal();
-}
-function trackMenu(){
-  if(mode!=='menu')return;dialogType='tracks';$('#modalContent').innerHTML='<h2><em>TRACKS.</em></h2>'+TRACKS.map(t=>`<button class="track-choice ${t===track?'selected':''}" data-track="${t.id}"><strong>${t.title} ${t===track?'↗':''}</strong><span>${t.bpm} BPM</span></button>`).join('')+'<button class="primary-button" data-action="close">DONE <span>↗</span></button>';modal.showModal();
+function showDialog(type){dialogType=type;renderDialog();if(!modal.open)modal.showModal();}
+function help(){showDialog('help');}
+function trackMenu(){if(mode==='menu')showDialog('tracks');}
+function renderDialog(){
+  let content='';
+  if(dialogType==='error')content=`<div class="eyebrow">${t('retry')}</div><h2>${t('oneMoreBeat')}</h2><p>${t('audioError')}</p><button class="primary-button" data-action="close">${t('gotIt')}</button>`;
+  if(dialogType==='pause')content=`<h2><em>${t('paused')}</em></h2><button class="primary-button" data-action="resume">${t('resume')} <span>▶</span></button><button class="secondary-button" data-action="restart">${t('restart')}</button><button class="secondary-button" data-action="home">${t('menu')}</button>`;
+  if(dialogType==='help')content=`<h2>${t('tap')} <em>+ ${t('hold')}</em></h2><div class="tutorial-row"><div class="note-demo"><span class="note-icon tap"></span></div><div><strong>${t('tap')}</strong><p>${t('tapHelp')}</p></div></div><div class="tutorial-row"><div class="note-demo"><span class="note-icon hold"></span></div><div><strong>${t('hold')}</strong><p>${t('holdHelp')}</p></div></div><p class="key-hint">${t('keyboardHelp')}</p><button class="primary-button" data-action="close">${t('gotIt')}</button>`;
+  if(dialogType==='tracks')content=`<h2><em>${t('tracks')}</em></h2>`+TRACKS.map(item=>`<button class="track-choice ${item===track?'selected':''}" data-track="${item.id}"><strong>${trackTitle(item)} ${item===track?'↗':''}</strong><span>${item.bpm} BPM</span></button>`).join('')+`<button class="primary-button" data-action="close">${t('done')} <span>↗</span></button>`;
+  if(dialogType==='results'&&lastResult){
+    const {reason,newBest,accuracy,grade}=lastResult;
+    content=`<div class="eyebrow">${t(reason==='complete'?'complete':'outOfEnergy')}</div><h2>${t(reason==='complete'?'niceFlow':'tryAgain')}</h2><div class="result-grade">${grade}</div><div class="result-score">${format(run.score)}</div><div class="result-best">${newBest?'↗ '+t('newBest'):trackTitle(track)}</div><div class="result-stats"><div><strong>${accuracy.toFixed(1)}%</strong><span>${t('accuracy')}</span></div><div><strong>${run.maxCombo}</strong><span>${t('maxCombo')}</span></div></div><div class="result-breakdown"><span>${run.counts.perfect} ${t('perfect')}</span><span>${run.counts.great+run.counts.good} ${t('goodGreat')}</span><span>${run.counts.miss} ${t('miss')}</span></div><button class="primary-button" data-action="restart">${t('playAgain')} <span>↗</span></button><button class="secondary-button" data-action="home">${t('tracks')}</button>`;
+  }
+  $('#modalContent').innerHTML=`<div class="dialog-language"><button class="language-button" data-language-toggle></button></div>`+content;
+  updateLanguageButtons();
 }
 $('#modalContent').addEventListener('click',e=>{
   const action=e.target.closest('[data-action]')?.dataset.action;
@@ -194,7 +235,7 @@ $('#modalContent').addEventListener('click',e=>{
 modal.addEventListener('cancel',e=>{e.preventDefault();if(dialogType==='pause')resume();else if(dialogType==='results')goHome();else closeModal();});
 $('#playButton').addEventListener('click',start);$('#pauseButton').addEventListener('click',pause);$('#helpButton').addEventListener('click',help);$('#trackButton').addEventListener('click',trackMenu);$('#nextTrack').addEventListener('click',()=>setTrack(TRACKS[(TRACKS.indexOf(track)+1)%TRACKS.length]));
 document.querySelectorAll('[data-difficulty]').forEach(b=>b.addEventListener('click',()=>setDifficulty(b.dataset.difficulty)));
-$('#soundButton').addEventListener('click',()=>{audio.setMuted(!audio.muted);$('#soundButton').setAttribute('aria-label',audio.muted?'Unmute sound':'Mute sound');$('#soundButton').title=audio.muted?'Unmute sound':'Mute sound';$('#soundButton').style.color=audio.muted?'#ff7b9f':'';$('#soundButton').innerHTML=audio.muted?'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m11 5-6 4H2v6h3l6 4zM16 9l6 6M22 9l-6 6"/></svg>':'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m11 5-6 4H2v6h3l6 4zM15 8a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14"/></svg>';});
+$('#soundButton').addEventListener('click',()=>{audio.setMuted(!audio.muted);syncSoundLabel();$('#soundButton').style.color=audio.muted?'#ff7b9f':'';$('#soundButton').innerHTML=audio.muted?'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m11 5-6 4H2v6h3l6 4zM16 9l6 6M22 9l-6 6"/></svg>':'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m11 5-6 4H2v6h3l6 4zM15 8a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14"/></svg>';});
 $('#fullscreenButton').addEventListener('click',async()=>{try{if(document.fullscreenElement){await document.exitFullscreen();screen.orientation?.unlock?.();}else if(document.documentElement.requestFullscreen){await document.documentElement.requestFullscreen();try{await screen.orientation?.lock?.('landscape');}catch{}}}catch{}});
 document.addEventListener('visibilitychange',()=>{if(document.hidden)pause();});window.addEventListener('blur',()=>{if(mode==='playing'||mode==='countdown')pause();});
 
@@ -237,4 +278,4 @@ function frame(now){
   particles=particles.filter(p=>p.life>0);for(const p of particles){p.life-=dt;p.x+=p.vx*dt;p.y+=p.vy*dt;p.vy+=170*dt;ctx.globalAlpha=Math.min(1,p.life*3);ctx.fillStyle=p.color;ctx.fillRect(p.x,p.y,2,2);}ctx.globalAlpha=1;
   requestAnimationFrame(frame);
 }
-setTrack(track);setDifficulty(difficulty);syncOrientation();resize();requestAnimationFrame(frame);
+applyLanguage();syncOrientation();resize();requestAnimationFrame(frame);
