@@ -1,7 +1,7 @@
 // Original procedural soundtrack. All playback and note timing share this audio clock.
 export class Soundtrack {
   constructor() { this.ctx = null; this.nodes = new Set(); this.muted = false; this.timer = null; }
-  async unlock() {
+  ensureContext() {
     if (!this.ctx) {
       this.ctx = new (window.AudioContext || window.webkitAudioContext)();
       this.master = this.ctx.createGain(); this.master.gain.value = this.muted ? 0 : .6;
@@ -10,8 +10,13 @@ export class Soundtrack {
       this.noise = this.ctx.createBuffer(1, this.ctx.sampleRate, this.ctx.sampleRate);
       const data = this.noise.getChannelData(0); for(let i=0;i<data.length;i++) data[i] = Math.random()*2-1;
     }
+  }
+  async unlock() {
+    this.ensureContext();
     if (this.ctx.state !== 'running') await this.ctx.resume();
   }
+  // Decoding need not resume playback; mobile browsers unlock at the Play gesture.
+  async decode(bytes) { this.ensureContext(); return this.ctx.decodeAudioData(bytes); }
   own(node) { this.nodes.add(node); node.onended = () => this.nodes.delete(node); return node; }
   tone(freq, time, duration, type='sine', volume=.15, slide=0) {
     const osc = this.own(this.ctx.createOscillator()), gain = this.ctx.createGain();
@@ -26,13 +31,17 @@ export class Soundtrack {
     gain.gain.setValueAtTime(volume,time);gain.gain.exponentialRampToValueAtTime(.0001,time+duration);
     src.connect(filter).connect(gain).connect(this.master);src.start(time);src.stop(time+duration);
   }
-  start(track) {
-    this.stop(); this.track=track;this.beat=60/track.bpm;this.startTime=this.ctx.currentTime+.1+3*this.beat;this.step=0;
+  start(track, leadIn=0) {
+    this.stop(); this.track=track;this.beat=60/track.bpm;this.startTime=this.ctx.currentTime+.1+Math.max(leadIn,3*this.beat);this.step=0;
     for(let i=0;i<3;i++) this.tone(i===2?880:660,this.startTime-(3-i)*this.beat,.07,'sine',.12);
+    if(track.buffer){
+      const source=this.own(this.ctx.createBufferSource());source.buffer=track.buffer;
+      source.connect(this.master);source.start(this.startTime);return;
+    }
     this.schedule(); this.timer=setInterval(()=>this.schedule(),25);
   }
   schedule() {
-    if(!this.track || this.ctx.state!=='running') return;
+    if(!this.track || this.track.buffer || this.ctx.state!=='running') return;
     while(this.startTime + this.step*this.beat/4 < this.ctx.currentTime+.15 && this.step < this.track.bars*16) {
       const s=this.step++, t=this.startTime+s*this.beat/4, bar=Math.floor(s/16), p=s%16;
       const chord=[0,8,3,10][Math.floor(bar/2)%4], root=this.track.root+chord;

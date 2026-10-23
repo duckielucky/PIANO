@@ -1,6 +1,8 @@
-import { TRACKS, WINDOWS, makeChart, gradeTiming, gradeAccuracy, Run } from './engine.js';
-import { Soundtrack } from './audio.js';
-import { chooseLanguage, translate } from './i18n.js?v=f77b9901f2';
+import { TRACKS, WINDOWS, makeChart, gradeTiming, gradeAccuracy, Run } from './engine.js?v=e79a57a318';
+import { Soundtrack } from './audio.js?v=a01c5ae2eb';
+import { makeAudioChart } from './beat-analysis.js?v=b4dd8bb6c0';
+import { importSong } from './song-import.js?v=d027d176ae';
+import { chooseLanguage, translate } from './i18n.js?v=0f8c60ab61';
 
 const $ = s => document.querySelector(s);
 const canvas=$('#canvas'), ctx=canvas.getContext('2d'), stage=$('#stage'), modal=$('#modal');
@@ -9,7 +11,51 @@ let savedLanguage;
 try { savedLanguage=localStorage.getItem('vipermix-language'); } catch {}
 let language=chooseLanguage(savedLanguage,navigator.language), lastResult=null;
 const t=(key,values)=>translate(language,key,values);
-const trackTitle=track=>t('track_'+track.id);
+const trackTitle=track=>track.uploaded?track.title:t('track_'+track.id);
+const escapeHtml=value=>String(value).replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+let uploadedTrack=null, importController=null;
+let uploadState={status:'idle',fileName:'',progress:null};
+const availableTracks=()=>uploadedTrack?[uploadedTrack,...TRACKS]:TRACKS;
+const clockText=seconds=>{const total=Math.round(seconds);return `${Math.floor(total/60).toString().padStart(2,'0')}:${(total%60).toString().padStart(2,'0')}`;};
+function showImport(){if(mode==='menu')showDialog('import');}
+function chooseFile(){if(mode!=='menu')return;$('#songFile').value='';$('#songFile').click();}
+async function loadSong(file){
+  if(!file||mode!=='menu')return;
+  importController?.abort();const controller=new AbortController();importController=controller;
+  uploadState={status:'decoding',fileName:file.name,progress:null};showDialog('import');
+  try{
+    const imported=await importSong(file,audio,controller.signal,(status,progress)=>{
+      if(importController!==controller||controller.signal.aborted)return;
+      uploadState={...uploadState,status,progress};if(dialogType==='import'&&modal.open)renderDialog();
+    });
+    if(controller.signal.aborted||importController!==controller)return;
+    if(!makeAudioChart(imported.analysis,'easy').length)throw new Error('analysisError');
+    uploadedTrack=imported;setTrack(imported);uploadState={status:'ready',fileName:imported.title,progress:100};renderDialog();
+  }catch(error){
+    if(controller.signal.aborted||importController!==controller)return;
+    const known=['decodeError','fileTooLarge','songTooLong','songTooShort','silentSong','analysisError'];
+    uploadState={status:'error',fileName:file.name,error:known.includes(error.message)?error.message:'analysisError'};
+    renderDialog();
+  }finally{if(importController===controller)importController=null;}
+}
+function importContent(){
+  const {status,fileName,progress}=uploadState;
+  const name=`<p class="import-filename">${escapeHtml(fileName)}</p>`;
+  const idle=`<h2>${t('importTitle')}</h2><p class="import-hint">${t('importHint')}</p><button class="audio-dropzone" data-action="choose-file"><span class="upload-symbol" aria-hidden="true">↥</span><strong>${t('chooseSong')}</strong><span>${t('fileTypes')}</span><small>${t('fileLimits')}</small></button><p class="import-privacy">${t('privacyNote')}</p><button class="secondary-button" data-action="close">${t('cancel')}</button>`;
+  if(status==='idle')return idle;
+  if(status==='error')return `<h2>${t('importFailed')}</h2>${name}<p class="import-error" role="alert">${t(uploadState.error)}</p><button class="primary-button" data-action="choose-file">${t('changeSong')}</button><button class="secondary-button" data-action="close">${t('cancel')}</button>`;
+  if(status==='ready'&&uploadedTrack){
+    const bars=uploadedTrack.analysis.waveform.map(value=>`<i style="height:${Math.max(5,Math.round(value*100))}%"></i>`).join('');
+    return `<div class="eyebrow">${t('ready')}</div>${name}<div class="audio-waveform" aria-hidden="true">${bars}</div><div class="song-facts"><span>${t('estimatedBpm',{bpm:uploadedTrack.bpm})}</span><span>${clockText(uploadedTrack.duration)}</span><span>${t('noteCount',{count:makeAudioChart(uploadedTrack.analysis,difficulty).length})}</span></div>${uploadedTrack.analysis.weakBeat?`<p class="import-hint">${t('weakBeat')}</p>`:''}<p class="import-privacy">${t('privacyNote')}</p><button class="primary-button" data-action="play-upload">▶ ${t('playSong')}</button><div class="import-footer"><button class="text-button" data-action="choose-file">${t('changeSong')}</button><button class="text-button" data-action="close">${t('done')}</button></div>`;
+  }
+  return `<div class="analysis-orbit" aria-hidden="true">♫</div><h2>${t(status)}</h2>${name}<progress class="analysis-progress" ${progress===null?'':`value="${progress}"`} max="100" aria-label="${t(status)}"></progress><p class="import-hint" role="status">${progress===null?t('decoding'):t('analyzing')+' '+progress+'%'}</p><button class="secondary-button" data-action="close">${t('cancel')}</button>`;
+}
+$('#songFile').addEventListener('change',event=>loadSong(event.target.files[0]));
+$('#uploadButton').addEventListener('click',showImport);
+modal.addEventListener('dragover',event=>{if(dialogType==='import'){event.preventDefault();modal.classList.add('file-dragover');}});
+modal.addEventListener('dragleave',()=>modal.classList.remove('file-dragover'));
+modal.addEventListener('drop',event=>{if(dialogType==='import'){event.preventDefault();modal.classList.remove('file-dragover');loadSong(event.dataTransfer.files[0]);}});
+
 function updateLanguageButtons(){
   document.querySelectorAll('[data-language-toggle]').forEach(button=>{
     button.textContent=t('switchLabel');button.setAttribute('aria-label',t('switchLanguage'));
@@ -52,14 +98,14 @@ function setMode(next){mode=next;document.body.dataset.state=next;syncOrientatio
 function pop(element){if(!reducedMotion)element.animate([{transform:'scale(1.13)'},{transform:'scale(1)'}],{duration:200,easing:'ease-out'});}
 const reducedMotion=matchMedia('(prefers-reduced-motion: reduce)').matches;
 const travel=()=>difficulty==='hard'?2.2:difficulty==='easy'?3.25:2.75;
-const duration=()=>track.bars*4*60/track.bpm;
+const duration=()=>track.duration??track.bars*4*60/track.bpm;
 const bestKey=()=>`neon-rush-tap-hold-best-${track.id}-${difficulty}`;
 function readBest(){try{return Number(localStorage.getItem(bestKey()))||0;}catch{return 0;}}
 function saveBest(score){try{localStorage.setItem(bestKey(),String(score));}catch{}}
 const format=n=>Math.round(n).toString().padStart(7,'0');
 function setTrack(next){
-  track=next;$('#trackName').textContent=trackTitle(track);$('#bpmLabel').textContent=track.bpm+' BPM';
-  const sec=Math.round(duration());$('#trackDetail').textContent=`${track.bpm} BPM · ${String(Math.floor(sec/60)).padStart(2,'0')}:${String(sec%60).padStart(2,'0')}`;
+  track=next;$('#trackName').textContent=trackTitle(track);$('#trackName').title=trackTitle(track);$('#bpmLabel').textContent=track.uploaded?t('estimatedBpm',{bpm:track.bpm}):track.bpm+' BPM';
+  const sec=Math.round(duration());$('#trackDetail').textContent=`${track.uploaded?t('estimatedBpm',{bpm:track.bpm}):track.bpm+' BPM'} · ${clockText(sec)}`;
   $('#best').textContent=format(readBest());
 }
 function setDifficulty(value){difficulty=value;$('#energyLabel').textContent=t(value==='easy'?'noFail':'energy');$('#modeHint').textContent=t(value==='easy'?'noFail':'tapHold');$('#difficultyLabel').textContent=t(value);document.querySelectorAll('[data-difficulty]').forEach(b=>{const active=b.dataset.difficulty===value;b.classList.toggle('selected',active);b.setAttribute('aria-pressed',String(active));});$('#best').textContent=format(readBest());}
@@ -155,11 +201,12 @@ function updateHUD(){
   const e=Math.round(run.energy);if(e!==lastEnergy){$('#energyFill').style.width=e+'%';$('#energyFill').style.background=e<25?'#ff7b9f':'var(--brand-gradient)';$('#energyText').textContent=e+'%';lastEnergy=e;}
 }
 async function start(){
+  if(mode==='playing'||mode==='countdown')return;
   const token=++session; closeModal();$('#playButton').disabled=true;
   try{await audio.unlock();}catch(e){$('#playButton').disabled=false;showError();return;}
   if(token!==session)return;
-  run=new Run(makeChart(track,difficulty),difficulty);lastScore=lastCombo=lastEnergy=-1;keys.clear();pointers.clear();particles=[];ripples=[];lastCountdown=null;
-  audio.start(track);setMode('countdown');$('#menu').hidden=true;$('#pauseButton').disabled=false;$('#nextTrack').hidden=true;$('#trackButton').disabled=true;$('#playingBars').hidden=false;$('#countdown').hidden=false;$('#playButton').disabled=false;$('#songProgress').style.width='0%';updateHUD();
+  run=new Run(track.uploaded?makeAudioChart(track.analysis,difficulty):makeChart(track,difficulty),difficulty);lastScore=lastCombo=lastEnergy=-1;keys.clear();pointers.clear();particles=[];ripples=[];lastCountdown=null;
+  audio.start(track,track.uploaded?travel()+.35:0);setMode('countdown');$('#menu').hidden=true;$('#pauseButton').disabled=false;$('#nextTrack').hidden=true;$('#trackButton').disabled=true;$('#playingBars').hidden=false;$('#countdown').hidden=false;$('#playButton').disabled=false;$('#songProgress').style.width='0%';updateHUD();
 }
 function showError(){showDialog('error');}
 function isLaneDown(lane){return keys.has(lane)||[...pointers.values()].some(p=>p.lane===lane);}
@@ -210,30 +257,36 @@ function finish(reason='complete'){
   const accuracy=run.accuracy,grade=gradeAccuracy(accuracy);
   lastResult={reason,newBest,accuracy,grade};showDialog('results');
 }
-function closeModal(){if(modal.open)modal.close();dialogType='';}
+function closeModal(){
+  if(dialogType==='import'&&importController){importController.abort();importController=null;uploadState={status:'idle',fileName:'',progress:null};}
+  if(modal.open)modal.close();dialogType='';modal.classList.remove('file-dragover');
+}
 function showDialog(type){dialogType=type;renderDialog();if(!modal.open)modal.showModal();}
 function help(){showDialog('help');}
 function trackMenu(){if(mode==='menu')showDialog('tracks');}
 function renderDialog(){
+  modal.dataset.dialog=dialogType;
   let content='';
+  if(dialogType==='import')content=importContent();
   if(dialogType==='error')content=`<div class="eyebrow">${t('retry')}</div><h2>${t('oneMoreBeat')}</h2><p>${t('audioError')}</p><button class="primary-button" data-action="close">${t('gotIt')}</button>`;
   if(dialogType==='pause')content=`<h2><em>${t('paused')}</em></h2><button class="primary-button" data-action="resume">${t('resume')} <span>▶</span></button><button class="secondary-button" data-action="restart">${t('restart')}</button><button class="secondary-button" data-action="home">${t('menu')}</button>`;
   if(dialogType==='help')content=`<h2>${t('tap')} <em>+ ${t('hold')}</em></h2><div class="tutorial-row"><div class="note-demo"><span class="note-icon tap"></span></div><div><strong>${t('tap')}</strong><p>${t('tapHelp')}</p></div></div><div class="tutorial-row"><div class="note-demo"><span class="note-icon hold"></span></div><div><strong>${t('hold')}</strong><p>${t('holdHelp')}</p></div></div><p class="key-hint">${t('keyboardHelp')}</p><button class="primary-button" data-action="close">${t('gotIt')}</button>`;
-  if(dialogType==='tracks')content=`<h2><em>${t('tracks')}</em></h2>`+TRACKS.map(item=>`<button class="track-choice ${item===track?'selected':''}" data-track="${item.id}"><strong>${trackTitle(item)} ${item===track?'↗':''}</strong><span>${item.bpm} BPM</span></button>`).join('')+`<button class="primary-button" data-action="close">${t('done')} <span>↗</span></button>`;
+  if(dialogType==='tracks')content=`<h2><em>${t('tracks')}</em></h2><button class="upload-button" data-action="import-song">＋ ${t('yourSong')}</button>`+availableTracks().map(item=>`<button class="track-choice ${item===track?'selected':''}" data-track="${item.id}"><strong>${escapeHtml(trackTitle(item))} ${item===track?'↗':''}</strong><span>${item.bpm} BPM${item.uploaded?' · '+t('uploaded'):''}</span></button>`).join('')+`<button class="primary-button" data-action="close">${t('done')} <span>↗</span></button>`;
   if(dialogType==='results'&&lastResult){
     const {reason,newBest,accuracy,grade}=lastResult;
-    content=`<div class="eyebrow">${t(reason==='complete'?'complete':'outOfEnergy')}</div><h2>${t(reason==='complete'?'niceFlow':'tryAgain')}</h2><div class="result-grade">${grade}</div><div class="result-score">${format(run.score)}</div><div class="result-best">${newBest?'↗ '+t('newBest'):trackTitle(track)}</div><div class="result-stats"><div><strong>${accuracy.toFixed(1)}%</strong><span>${t('accuracy')}</span></div><div><strong>${run.maxCombo}</strong><span>${t('maxCombo')}</span></div></div><div class="result-breakdown"><span>${run.counts.perfect} ${t('perfect')}</span><span>${run.counts.great+run.counts.good} ${t('goodGreat')}</span><span>${run.counts.miss} ${t('miss')}</span></div><button class="primary-button" data-action="restart">${t('playAgain')} <span>↗</span></button><button class="secondary-button" data-action="home">${t('tracks')}</button>`;
+    content=`<div class="eyebrow">${t(reason==='complete'?'complete':'outOfEnergy')}</div><h2>${t(reason==='complete'?'niceFlow':'tryAgain')}</h2><div class="result-grade">${grade}</div><div class="result-score">${format(run.score)}</div><div class="result-best">${newBest?'↗ '+t('newBest'):escapeHtml(trackTitle(track))}</div><div class="result-stats"><div><strong>${accuracy.toFixed(1)}%</strong><span>${t('accuracy')}</span></div><div><strong>${run.maxCombo}</strong><span>${t('maxCombo')}</span></div></div><div class="result-breakdown"><span>${run.counts.perfect} ${t('perfect')}</span><span>${run.counts.great+run.counts.good} ${t('goodGreat')}</span><span>${run.counts.miss} ${t('miss')}</span></div><button class="primary-button" data-action="restart">${t('playAgain')} <span>↗</span></button><button class="secondary-button" data-action="home">${t('tracks')}</button>`;
   }
   $('#modalContent').innerHTML=`<div class="dialog-language"><button class="language-button" data-language-toggle></button></div>`+content;
   updateLanguageButtons();
 }
 $('#modalContent').addEventListener('click',e=>{
   const action=e.target.closest('[data-action]')?.dataset.action;
+  if(action==='import-song')showImport();if(action==='choose-file')chooseFile();if(action==='play-upload'){setTrack(uploadedTrack);start();}
   if(action==='close')closeModal();if(action==='resume')resume();if(action==='restart')start();if(action==='home')goHome();
-  const id=e.target.closest('[data-track]')?.dataset.track;if(id){setTrack(TRACKS.find(t=>t.id===id));closeModal();}
+  const id=e.target.closest('[data-track]')?.dataset.track;if(id){setTrack(availableTracks().find(t=>t.id===id));closeModal();}
 });
 modal.addEventListener('cancel',e=>{e.preventDefault();if(dialogType==='pause')resume();else if(dialogType==='results')goHome();else closeModal();});
-$('#playButton').addEventListener('click',start);$('#pauseButton').addEventListener('click',pause);$('#helpButton').addEventListener('click',help);$('#trackButton').addEventListener('click',trackMenu);$('#nextTrack').addEventListener('click',()=>setTrack(TRACKS[(TRACKS.indexOf(track)+1)%TRACKS.length]));
+$('#playButton').addEventListener('click',start);$('#pauseButton').addEventListener('click',pause);$('#helpButton').addEventListener('click',help);$('#trackButton').addEventListener('click',trackMenu);$('#nextTrack').addEventListener('click',()=>setTrack(availableTracks()[(availableTracks().indexOf(track)+1)%availableTracks().length]));
 document.querySelectorAll('[data-difficulty]').forEach(b=>b.addEventListener('click',()=>setDifficulty(b.dataset.difficulty)));
 $('#soundButton').addEventListener('click',()=>{audio.setMuted(!audio.muted);syncSoundLabel();$('#soundButton').style.color=audio.muted?'#ff7b9f':'';$('#soundButton').innerHTML=audio.muted?'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m11 5-6 4H2v6h3l6 4zM16 9l6 6M22 9l-6 6"/></svg>':'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m11 5-6 4H2v6h3l6 4zM15 8a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14"/></svg>';});
 $('#fullscreenButton').addEventListener('click',async()=>{try{if(document.fullscreenElement){await document.exitFullscreen();screen.orientation?.unlock?.();}else if(document.documentElement.requestFullscreen){await document.documentElement.requestFullscreen();try{await screen.orientation?.lock?.('landscape');}catch{}}}catch{}});
