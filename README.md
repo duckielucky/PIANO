@@ -1,6 +1,6 @@
 # Neon Rush
 
-A playable, portrait-first rhythm game inspired by classic four-lane mobile rhythm games. Built with Canvas 2D, Web Audio, and plain JavaScript.
+A playable, landscape-first rhythm game inspired by classic four-lane mobile rhythm games. Built with Canvas 2D, Web Audio, and plain JavaScript.
 
 ## Play locally
 
@@ -8,7 +8,7 @@ A playable, portrait-first rhythm game inspired by classic four-lane mobile rhyt
 npm run dev
 ```
 
-Open http://localhost:5186. On a phone on the same Wi-Fi, use your computer's LAN IP with port 5186. The published Sites URL also works directly on iPhone.
+Open http://localhost:5186. On a phone on the same Wi-Fi, use your computer's LAN IP with port 5186. The published Sites URL also works directly on iPhone. Turn the phone sideways for the wide layout. The portrait prompt also offers a compact fallback.
 
 - Touch: tap a lane at the glowing line; hold green notes until their tail arrives.
 - Keyboard: **D F J K**. Keep the lane key pressed for green holds.
@@ -17,7 +17,7 @@ Open http://localhost:5186. On a phone on the same Wi-Fi, use your computer's LA
 - All modes use taps and holds only. Chill is the default, with slower notes, half as many notes as before, one-beat holds, generous timing, and no game over. The starting track is the slower Afterglow.
 - Scores use a separate tap-and-hold record so old, denser charts do not set an unreachable personal best.
 
-Music starts after a user gesture, as required by mobile browsers. Audio and note positions use the same AudioContext clock. Wired headphones or speakers avoid Bluetooth audio delay. Browser preview was checked at iPhone dimensions; physical iPhone hardware was not available for testing.
+Music starts after a user gesture, as required by mobile browsers. Audio and note positions use the same AudioContext clock. Wired headphones or speakers avoid Bluetooth audio delay. Browser preview covers desktop and landscape iPhone dimensions; physical iPhone hardware was not available for testing.
 
 ## Verify
 

@@ -6,9 +6,17 @@ const canvas=$('#canvas'), ctx=canvas.getContext('2d'), stage=$('#stage'), modal
 const audio = new Soundtrack();
 let track = TRACKS[1], difficulty='easy', mode='menu', run=null;
 let width=390,height=550,dpr=1, lastFrame=0, flashes=[0,0,0,0], particles=[], ripples=[], pointers=new Map(), keys=new Set();
-let dialogType='', session=0;
+let dialogType='', session=0, allowPortrait=false;
+const portraitScreen=matchMedia('(max-width: 600px) and (orientation: portrait)');
+function syncOrientation(){
+  const prompt=portraitScreen.matches&&!allowPortrait&&mode==='menu';
+  $('#orientationHint').hidden=!prompt;$('#game').inert=prompt;
+  document.body.classList.toggle('portrait-fallback',portraitScreen.matches&&!prompt);
+}
+portraitScreen.addEventListener('change',syncOrientation);
+$('#portraitButton').addEventListener('click',()=>{allowPortrait=true;syncOrientation();});
 let lastScore=-1,lastCombo=-1,lastEnergy=-1, visualTime=0, lastCountdown=null;
-function setMode(next){mode=next;document.body.dataset.state=next;}
+function setMode(next){mode=next;document.body.dataset.state=next;syncOrientation();}
 function pop(element){if(!reducedMotion)element.animate([{transform:'scale(1.13)'},{transform:'scale(1)'}],{duration:200,easing:'ease-out'});}
 const reducedMotion=matchMedia('(prefers-reduced-motion: reduce)').matches;
 const travel=()=>difficulty==='hard'?2.2:difficulty==='easy'?3.25:2.75;
@@ -26,7 +34,7 @@ function setDifficulty(value){difficulty=value;$('#energyLabel').textContent=val
 function resize(){const r=stage.getBoundingClientRect();width=r.width;height=r.height;dpr=Math.min(devicePixelRatio||1,2);canvas.width=Math.round(width*dpr);canvas.height=Math.round(height*dpr);ctx.setTransform(dpr,0,0,dpr,0,0);}
 new ResizeObserver(resize).observe(stage);
 
-// Perspective projection. All geometry is normalized to the portrait stage.
+// Perspective projection adapts to the available landscape or fallback stage.
 function project(f,lane=.5){const p=Math.pow(Math.max(0,f),1.65), span=width*(.28+.66*p);return {x:width/2+(lane-.5)*span,y:height*(.025+.79*p),span,p};}
 function polygon(points,fill,stroke,line=1){ctx.beginPath();points.forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));ctx.closePath();if(fill){ctx.fillStyle=fill;ctx.fill();}if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=line;ctx.stroke();}}
 function line(a,b,color,size=1){ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.strokeStyle=color;ctx.lineWidth=size;ctx.stroke();}
@@ -187,7 +195,7 @@ modal.addEventListener('cancel',e=>{e.preventDefault();if(dialogType==='pause')r
 $('#playButton').addEventListener('click',start);$('#pauseButton').addEventListener('click',pause);$('#helpButton').addEventListener('click',help);$('#trackButton').addEventListener('click',trackMenu);$('#nextTrack').addEventListener('click',()=>setTrack(TRACKS[(TRACKS.indexOf(track)+1)%TRACKS.length]));
 document.querySelectorAll('[data-difficulty]').forEach(b=>b.addEventListener('click',()=>setDifficulty(b.dataset.difficulty)));
 $('#soundButton').addEventListener('click',()=>{audio.setMuted(!audio.muted);$('#soundButton').setAttribute('aria-label',audio.muted?'Unmute sound':'Mute sound');$('#soundButton').title=audio.muted?'Unmute sound':'Mute sound';$('#soundButton').style.color=audio.muted?'#ff7b9f':'';$('#soundButton').innerHTML=audio.muted?'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m11 5-6 4H2v6h3l6 4zM16 9l6 6M22 9l-6 6"/></svg>':'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m11 5-6 4H2v6h3l6 4zM15 8a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14"/></svg>';});
-$('#fullscreenButton').addEventListener('click',async()=>{try{if(document.fullscreenElement)await document.exitFullscreen();else await document.documentElement.requestFullscreen();}catch{}});
+$('#fullscreenButton').addEventListener('click',async()=>{try{if(document.fullscreenElement){await document.exitFullscreen();screen.orientation?.unlock?.();}else if(document.documentElement.requestFullscreen){await document.documentElement.requestFullscreen();try{await screen.orientation?.lock?.('landscape');}catch{}}}catch{}});
 document.addEventListener('visibilitychange',()=>{if(document.hidden)pause();});window.addEventListener('blur',()=>{if(mode==='playing'||mode==='countdown')pause();});
 
 function frame(now){
@@ -229,4 +237,4 @@ function frame(now){
   particles=particles.filter(p=>p.life>0);for(const p of particles){p.life-=dt;p.x+=p.vx*dt;p.y+=p.vy*dt;p.vy+=170*dt;ctx.globalAlpha=Math.min(1,p.life*3);ctx.fillStyle=p.color;ctx.fillRect(p.x,p.y,2,2);}ctx.globalAlpha=1;
   requestAnimationFrame(frame);
 }
-setTrack(track);setDifficulty(difficulty);resize();requestAnimationFrame(frame);
+setTrack(track);setDifficulty(difficulty);syncOrientation();resize();requestAnimationFrame(frame);
