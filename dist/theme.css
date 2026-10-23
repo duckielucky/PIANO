@@ -1,0 +1,76 @@
+/* ViperMix-inspired finish. Background sampled from the supplied swatch. */
+:root {
+  --ui: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --ink: #120a24;
+  --panel: #1c1234;
+  --white: #faf8ff;
+  --muted: #aaa0c1;
+  --accent: #c898ff;
+  --tap: #79b8ff;
+  --purple: #ac88ff;
+  --line: #c3a6ff16;
+  --brand-gradient: linear-gradient(90deg, #9c5af7 0%, #447df4 111.54%);
+  font-family: var(--ui);
+}
+body {background: linear-gradient(180deg, #150927, #100a21)}
+body::before {background: radial-gradient(ellipse at 50% 65%, #6633a914, transparent 65%);mask-image:none}
+.phone {background:linear-gradient(180deg,#150927,#100a21);border-color:#9374bf3b;box-shadow:0 0 0 5px #21133266,0 0 0 6px #9b6bd51c,0 25px 100px #06020c99}
+.game-header {background:#120a2499;border-color:var(--line)}
+.wordmark {font-family:var(--ui);font-style:normal;font-size:20px;font-weight:850;letter-spacing:-.8px}
+.wordmark>span:first-child {background:var(--brand-gradient);background-clip:text;-webkit-background-clip:text;color:transparent;margin-left:4px}
+.small-star {color:#ac88ff;font-size:13px;margin-top:2px}
+.icon-button {border-color:#ac88ff2e;background:#b68bff0a;border-radius:11px;color:#cfc5e5;transition:background .2s,border-color .2s}
+.icon-button:hover {background:#9c5af724;border-color:#ac88ff66}
+.scoreboard strong,.result-score,.result-stats strong {font-family:var(--ui);font-variant-numeric:tabular-nums;letter-spacing:-1px;font-weight:650}
+.label,.best-score .label {color:#b0a4c7;letter-spacing:1.1px}
+.best-score strong {color:#d4c6e7;letter-spacing:0}
+.energy {background:#412458;border-radius:6px}
+.energy>div {background:var(--brand-gradient);box-shadow:0 0 12px #9c5af745;border-radius:inherit}
+.energy span {color:#b0a4c7}.energy b{color:#d7b8ff}
+.stage {border-color:var(--line)}
+.stage-meta {color:#b4a4cb;letter-spacing:1.1px}
+.stage-meta i {background:#ae80ff;box-shadow:0 0 8px #9c5af766}
+.lane-inputs span {font-family:var(--ui);color:#b6a1d3;opacity:.75}
+.combo strong,.judgment,.countdown {font-family:var(--ui);font-style:normal;font-weight:800;letter-spacing:-1px}
+.combo span {color:#c3b3dd}.countdown{background:#120a2433}
+.menu-overlay {background:linear-gradient(145deg,#28134480,#130b2699);border-color:var(--line)}
+.ready-chip {padding:6px 10px;border:1px solid #ae80ff26;border-radius:999px;background:#9c5af710;color:#d8c7ed;letter-spacing:1px}
+.ready-chip>span:first-child {background:#b98aff;box-shadow:0 0 8px #9c5af788}
+h2,dialog h2 {font-family:var(--ui);font-style:normal;font-weight:800;letter-spacing:-1.5px;line-height:1.1}
+.menu-title {gap:8px;margin:20px 0 27px}
+.menu-title span {font-family:var(--ui);font-size:15px;font-weight:600;letter-spacing:1.6px;color:#d4c6e7}
+.menu-title em {font-size:55px;font-style:normal;line-height:1.05;letter-spacing:-3px;background:linear-gradient(110deg,#d0a6ff 10%,#a77af9 52%,#81b2ff);background-clip:text;-webkit-background-clip:text;color:transparent}
+.difficulty-selector {border-color:#ac88ff2b;background:#150c29;border-radius:12px;padding:4px}
+.difficulty-selector button {color:#c0b4d2;border-radius:8px;letter-spacing:.5px}
+.difficulty-selector button.selected {background:linear-gradient(135deg,#7c5bf559,#5b4be040);color:white;box-shadow:inset 0 0 0 1px #c0a0ff30,0 2px 8px #08020f33}
+.difficulty-selector button:hover {color:#ecdeff}
+.primary-button {background:var(--brand-gradient);color:white;border:1px solid #ceb2ff33;border-radius:12px;box-shadow:0 5px 25px #7c5bf53b;letter-spacing:1px;transition:filter .2s}
+.primary-button:hover {background:var(--brand-gradient);filter:brightness(1.12)}
+.text-button {color:#b5a5cc;letter-spacing:1px}.text-button:hover{color:#eee0ff}.text-button span{border-color:#9580b8}
+.track-footer {background:linear-gradient(135deg,#27173b,#1a102e);border-color:var(--line)}
+.track-art {border-color:#ac88ff45;border-radius:11px;background:radial-gradient(ellipse at 25% 15%,#447df445,transparent 70%),linear-gradient(135deg,#7c5bf559,#5b4be040)}
+.track-art svg {stroke:#e0c8ff;fill:#9c5af72b}
+.track-info strong {color:#f4edff}.track-info>span:last-child{color:#b4a3c9;letter-spacing:.3px}
+.next-track {background:none;border:0}.next-track:hover{background:#9c5af718}
+.playing-bars i {background:linear-gradient(#d0a6ff,#6495ff)}
+.song-progress {background:#342047}.song-progress div{background:var(--brand-gradient)}
+dialog {background:linear-gradient(145deg,#29173d,#160e2c);border-color:#b189ec45;border-radius:18px}
+dialog::backdrop {background:#080411bd}
+dialog h2 {font-size:31px}dialog p{color:#c4b5d9}
+dialog .secondary-button {background:#9c5af712;border-color:#ae80ff29;border-radius:12px;color:#d9caef}
+dialog .secondary-button:hover {background:#9c5af726}
+.tutorial-row {border-color:var(--line)}.key-hint{color:#c3b0df}
+.note-demo {border-color:#79b8ff88;background:linear-gradient(transparent,#79b8ff0c)}
+.result-grade {font-family:var(--ui);font-style:normal;font-weight:800;color:#d0a6ff}
+.result-stats div {background:#9c5af716;border:1px solid #ac88ff1c;border-radius:12px}
+.result-stats span,.result-breakdown {color:#bba9d3}
+.track-choice {background:#9c5af710;border-color:#ac88ff26;border-radius:12px}
+.track-choice.selected {background:linear-gradient(135deg,#7c5bf538,#5b4be025);border-color:#b188f0}
+.track-choice span {color:#bba9d3}
+.orientation-hint {background:radial-gradient(ellipse at 50% 45%,#6e329d1a,transparent 60%),linear-gradient(180deg,#150927,#100a21)}
+.orientation-hint h2 {font-size:42px;line-height:1.1}.orientation-hint h2 em{font-style:normal;color:#c898ff}
+@keyframes button-breathe {0%,100%{box-shadow:0 4px 22px #9c5af72a}50%{box-shadow:0 4px 32px #7c5bf557}}
+@media(max-width:1000px) {.wordmark{font-size:18px}.menu-title span{font-size:13px}.menu-title em{font-size:44px}.menu-title{margin:17px 0 22px}}
+@media(orientation:landscape) and (max-height:540px) {body{background:linear-gradient(180deg,#150927,#100a21)}.phone{box-shadow:none}.menu-title{margin:13px 0 17px}.menu-title em{font-size:43px}.menu-title span{font-size:12px}.ready-chip{padding:5px 9px}.scoreboard strong{font-size:21px}.best-score strong{font-size:14px}.text-button{font-size:8px}dialog h2{font-size:27px;letter-spacing:-1px}.result-grade{font-size:38px}}
+@media(orientation:landscape) and (max-height:350px) {.menu-title em{font-size:35px}.menu-title{margin:8px 0 11px}.ready-chip{padding:4px 8px}}
+@media(max-width:600px) and (orientation:portrait) {.portrait-fallback .menu-overlay{background:linear-gradient(0deg,#100a21 0%,#120a24ee 28%,#15092788 57%,transparent 85%)}.portrait-fallback .menu-title em{font-size:62px}.portrait-fallback .menu-title span{font-size:17px}}
