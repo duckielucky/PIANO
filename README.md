@@ -34,7 +34,7 @@ The English / 简体中文 toggle works on the game, rotation prompt, and dialog
 
 ## Play your own song
 
-Choose **YOUR SONG / 上传音乐**, select an audio file, then play the generated chart. Supported formats depend on the browser (typically MP3, WAV, M4A, OGG, and FLAC); limits are 80 MB, 5 seconds minimum, and 15 minutes maximum. The audio stays on the device and is not uploaded. One imported song is retained in memory; choose the file again after refreshing. A hash of the file keeps its personal best separate from other songs.
+Choose the main **UPLOAD SONG / 上传歌曲** button and select an audio file. VIPERMIX detects its beats, generates the chart, and automatically starts a countdown to play. If the tab is hidden or the browser requires another audio gesture, the ready screen keeps a **PLAY THIS SONG / 开始挑战** button. **PLAY DEMO / 试玩示例** still plays the selected built-in track. Supported formats depend on the browser (typically MP3, WAV, M4A, OGG, and FLAC); limits are 80 MB, 5 seconds minimum, and 15 minutes maximum. The audio stays on the device and is not uploaded. One imported song is retained in memory; choose the file again after refreshing. A hash of the file keeps its personal best separate from other songs.
 
 Analysis runs in a Web Worker using energy rises in three frequency bands. Notes use detected attack timestamps, so they follow changes in the song instead of an assumed constant BPM. Difficulty thins those attacks into a playable tap-and-hold chart. BPM is an estimate and can have half/double-tempo ambiguity. Songs without a clear beat use a labelled gentle fallback that skips silence. Results vary with the recording and arrangement.
 

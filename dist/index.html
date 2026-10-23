@@ -6,12 +6,12 @@
   <meta name="theme-color" content="#120a24">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="description" content="Find your flow in VIPERMIX. A four-lane landscape rhythm game with original electronic music. Tap, hold, and find your rhythm at an easier pace.">
+  <meta name="description" content="Upload a song and VIPERMIX turns its beats into a rhythm game. Tap blue notes and hold purple notes. Play in English or Chinese.">
   <title>VIPERMIX — Find your rhythm</title>
   <link rel="icon" href="vipermix-icon.png?v=83b93f0585" type="image/png">
   <link rel="stylesheet" href="style.css?v=379e116f4a">
   <link rel="stylesheet" href="landscape.css?v=0536fceadf">
-  <link rel="stylesheet" href="theme.css?v=7b7d30bc4e">
+  <link rel="stylesheet" href="theme.css?v=4b58cefc17">
 </head>
 <body data-state="menu">
   <main class="phone" id="game" data-i18n-aria="game" aria-label="VIPERMIX rhythm game">
@@ -30,8 +30,9 @@
         <div class="ready-chip"><span></span> <span id="modeHint">NO FAIL</span></div>
         <h2 class="menu-title"><span data-i18n="tapHold">TAP. HOLD.</span><em data-i18n="flow">FLOW.</em></h2>
         <div class="difficulty-selector" role="group" data-i18n-aria="difficulty" aria-label="Difficulty"><button class="selected" data-difficulty="easy" data-i18n="easy" aria-pressed="true">CHILL</button><button data-difficulty="normal" data-i18n="normal">NORMAL</button><button data-difficulty="hard" data-i18n="hard">EXPERT</button></div>
-        <button class="primary-button" id="playButton"><span class="play-icon">▶</span> <span data-i18n="play">PLAY</span> <span class="button-arrow">↗</span></button>
-        <button class="upload-button" id="uploadButton"><span aria-hidden="true">＋</span><span data-i18n="yourSong">YOUR SONG</span></button>
+        <button class="primary-button" id="uploadButton"><span aria-hidden="true">＋</span><span data-i18n="yourSong">UPLOAD SONG</span></button>
+        <p class="upload-flow" data-i18n="uploadFlow">Your song → beats → game</p>
+        <button class="upload-button" id="playButton"><span aria-hidden="true">▶</span><span id="playLabel" data-i18n="playDemo">PLAY DEMO</span></button>
         <button class="text-button" id="helpButton"><span class="button-label" data-i18n="help">HELP</span> <span>?</span></button>
       </div>
     <footer class="track-footer"><button class="track-art" id="trackButton" data-i18n-aria="changeTrack" aria-label="Change track"><svg viewBox="0 0 48 48" aria-hidden="true"><path d="M5 30 17 7 25 29 34 12 43 30 32 39 16 38Z"/><path d="m5 30 20-1 7 10M17 7l-1 31m18-26-9 17 18 1"/></svg></button><div class="track-info"><strong id="trackName">Afterglow</strong><span id="trackDetail">110 BPM · 00:52</span></div><button class="next-track icon-button" id="nextTrack" data-i18n-aria="nextTrack" aria-label="Select next track" data-i18n-title="nextTrack" title="Next track">⌃<span>⌄</span></button><div class="playing-bars" id="playingBars" hidden><i></i><i></i><i></i><i></i></div></footer><div class="song-progress"><div id="songProgress"></div></div>
@@ -44,6 +45,6 @@
     <h2><span data-i18n="turn">TURN</span><br><em data-i18n="sideways">SIDEWAYS.</em></h2>
     <button class="text-button" id="portraitButton" data-i18n="portrait">PLAY HERE ANYWAY</button>
   </section>
-  <script type="module" src="game.js?v=f583436b46"></script>
+  <script type="module" src="game.js?v=b8ee970e89"></script>
 </body>
 </html>

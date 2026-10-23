@@ -2,7 +2,7 @@ import { TRACKS, WINDOWS, makeChart, gradeTiming, gradeAccuracy, Run } from './e
 import { Soundtrack } from './audio.js?v=a01c5ae2eb';
 import { makeAudioChart } from './beat-analysis.js?v=b4dd8bb6c0';
 import { importSong } from './song-import.js?v=d027d176ae';
-import { chooseLanguage, translate } from './i18n.js?v=0f8c60ab61';
+import { chooseLanguage, translate } from './i18n.js?v=75718d5a91';
 
 const $ = s => document.querySelector(s);
 const canvas=$('#canvas'), ctx=canvas.getContext('2d'), stage=$('#stage'), modal=$('#modal');
@@ -17,8 +17,12 @@ let uploadedTrack=null, importController=null;
 let uploadState={status:'idle',fileName:'',progress:null};
 const availableTracks=()=>uploadedTrack?[uploadedTrack,...TRACKS]:TRACKS;
 const clockText=seconds=>{const total=Math.round(seconds);return `${Math.floor(total/60).toString().padStart(2,'0')}:${(total%60).toString().padStart(2,'0')}`;};
-function showImport(){if(mode==='menu')showDialog('import');}
-function chooseFile(){if(mode!=='menu')return;$('#songFile').value='';$('#songFile').click();}
+function chooseFile(){
+  if(mode!=='menu')return;
+  // Unlock during the upload gesture so the generated game can start on mobile.
+  void audio.unlock().catch(()=>{});
+  $('#songFile').value='';$('#songFile').click();
+}
 async function loadSong(file){
   if(!file||mode!=='menu')return;
   importController?.abort();const controller=new AbortController();importController=controller;
@@ -31,6 +35,10 @@ async function loadSong(file){
     if(controller.signal.aborted||importController!==controller)return;
     if(!makeAudioChart(imported.analysis,'easy').length)throw new Error('analysisError');
     uploadedTrack=imported;setTrack(imported);uploadState={status:'ready',fileName:imported.title,progress:100};renderDialog();
+    // Keep a Play button if the browser suspended audio or this tab is hidden.
+    // Otherwise go straight from analysis to the game's visible countdown.
+    importController=null;
+    if(!document.hidden&&audio.ctx?.state==='running')await start();
   }catch(error){
     if(controller.signal.aborted||importController!==controller)return;
     const known=['decodeError','fileTooLarge','songTooLong','songTooShort','silentSong','analysisError'];
@@ -51,7 +59,7 @@ function importContent(){
   return `<div class="analysis-orbit" aria-hidden="true">♫</div><h2>${t(status)}</h2>${name}<progress class="analysis-progress" ${progress===null?'':`value="${progress}"`} max="100" aria-label="${t(status)}"></progress><p class="import-hint" role="status">${progress===null?t('decoding'):t('analyzing')+' '+progress+'%'}</p><button class="secondary-button" data-action="close">${t('cancel')}</button>`;
 }
 $('#songFile').addEventListener('change',event=>loadSong(event.target.files[0]));
-$('#uploadButton').addEventListener('click',showImport);
+$('#uploadButton').addEventListener('click',chooseFile);
 modal.addEventListener('dragover',event=>{if(dialogType==='import'){event.preventDefault();modal.classList.add('file-dragover');}});
 modal.addEventListener('dragleave',()=>modal.classList.remove('file-dragover'));
 modal.addEventListener('drop',event=>{if(dialogType==='import'){event.preventDefault();modal.classList.remove('file-dragover');loadSong(event.dataTransfer.files[0]);}});
@@ -105,6 +113,7 @@ function saveBest(score){try{localStorage.setItem(bestKey(),String(score));}catc
 const format=n=>Math.round(n).toString().padStart(7,'0');
 function setTrack(next){
   track=next;$('#trackName').textContent=trackTitle(track);$('#trackName').title=trackTitle(track);$('#bpmLabel').textContent=track.uploaded?t('estimatedBpm',{bpm:track.bpm}):track.bpm+' BPM';
+  $('#playLabel').textContent=t(track.uploaded?'playSong':'playDemo');
   const sec=Math.round(duration());$('#trackDetail').textContent=`${track.uploaded?t('estimatedBpm',{bpm:track.bpm}):track.bpm+' BPM'} · ${clockText(sec)}`;
   $('#best').textContent=format(readBest());
 }
@@ -281,7 +290,7 @@ function renderDialog(){
 }
 $('#modalContent').addEventListener('click',e=>{
   const action=e.target.closest('[data-action]')?.dataset.action;
-  if(action==='import-song')showImport();if(action==='choose-file')chooseFile();if(action==='play-upload'){setTrack(uploadedTrack);start();}
+  if(action==='import-song'||action==='choose-file')chooseFile();if(action==='play-upload'){setTrack(uploadedTrack);start();}
   if(action==='close')closeModal();if(action==='resume')resume();if(action==='restart')start();if(action==='home')goHome();
   const id=e.target.closest('[data-track]')?.dataset.track;if(id){setTrack(availableTracks().find(t=>t.id===id));closeModal();}
 });
