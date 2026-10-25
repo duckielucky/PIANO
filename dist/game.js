@@ -1,7 +1,7 @@
 import { TRACKS, WINDOWS, makeChart, gradeTiming, gradeAccuracy, Run } from './engine.js?v=e79a57a318';
-import { Soundtrack } from './audio.js?v=a01c5ae2eb';
-import { makeAudioChart } from './beat-analysis.js?v=b4dd8bb6c0';
-import { importSong } from './song-import.js?v=d027d176ae';
+import { Soundtrack } from './audio.js?v=71ed956385';
+import { makeAudioChart } from './beat-analysis.js?v=3ab60c8f1e';
+import { importSong } from './song-import.js?v=bf9abbbf96';
 import { chooseLanguage, translate } from './i18n.js?v=1de5887422';
 
 const $ = s => document.querySelector(s);

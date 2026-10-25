@@ -61,3 +61,21 @@ test('chart difficulty stays playable and restart returns fresh notes',()=>{
   }
   assert.ok(makeAudioChart(analysis,'easy').some(n=>n.type==='hold'));
 });
+
+test('notes follow the beat, not every sound in the song',()=>{
+  // A 100 BPM groove: a kick on every beat, a hi-hat between beats, and a
+  // singer whose syllables land anywhere. Notes belong on the kicks.
+  const bpm=100,beat=60/bpm,duration=30,samples=new Float32Array(rate*duration);
+  const hit=(time,freq,amp,decay)=>{for(let i=0;i<rate*.12;i++){const k=Math.round(time*rate)+i;if(k<samples.length)samples[k]+=amp*Math.sin(i/rate*2*Math.PI*freq)*Math.exp(-i/rate*decay);}};
+  const kicks=[];for(let t=.5;t<duration-.5;t+=beat){kicks.push(t);hit(t,90,.8,30);hit(t+beat/2,5200,.18,90);}
+  let seed=7;const rand=()=>(seed=(seed*16807)%2147483647)/2147483647;
+  for(let t=.7;t<duration-.5;t+=.23+rand()*.4)hit(t,700+rand()*500,.25,25);
+  const analysis=analyzePcm([samples],rate);
+  assert.ok(Math.abs(analysis.bpm-bpm)<=2,'tempo '+analysis.bpm);
+  for(const difficulty of ['easy','normal']){
+    const chart=makeAudioChart(analysis,difficulty);
+    assert.ok(chart.length>(difficulty==='easy'?60:120)*.8*(duration-1)/60/ (difficulty==='easy'?1.2:1.2),difficulty+' has notes: '+chart.length);
+    const onBeat=chart.filter(n=>kicks.some(k=>Math.abs(k-n.time)<.035)).length/chart.length;
+    assert.ok(onBeat>=.95,difficulty+' notes on the beat: '+onBeat.toFixed(2));
+  }
+});

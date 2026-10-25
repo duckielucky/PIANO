@@ -28,7 +28,7 @@ export async function importSong(file,audio,signal,onProgress){
   }
   check(signal);
   const analysis=await new Promise((resolve,reject)=>{
-    const worker=new Worker(new URL('./beat-worker.js?v=6bdb8b2d3f',import.meta.url),{type:'module'});
+    const worker=new Worker(new URL('./beat-worker.js?v=0bd8901582',import.meta.url),{type:'module'});
     const cleanup=()=>{worker.terminate();signal.removeEventListener('abort',abort);clearTimeout(timeout);};
     const abort=()=>{cleanup();reject(cancelled());};
     const timeout=setTimeout(()=>{cleanup();reject(new Error('analysisError'));},90000);

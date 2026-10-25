@@ -60,7 +60,10 @@ export class Soundtrack {
       if(p===14 && bar%4===3) this.hiss(t,.16,3400,.1);
     }
   }
-  get time(){return this.ctx?this.ctx.currentTime-this.startTime:0;}
+  // What you hear lags the clock by the device's output delay (large on
+  // Bluetooth); notes follow the sound you hear, not the sound being sent.
+  get latency(){const c=this.ctx;if(!c)return 0;const v=(Number(c.outputLatency)||0)+(Number(c.baseLatency)||0);return Math.min(.5,Math.max(0,v));}
+  get time(){return this.ctx?this.ctx.currentTime-this.latency-this.startTime:0;}
   async pause(){if(this.ctx?.state==='running')await this.ctx.suspend();}
   async resume(){await this.unlock();this.schedule();}
   setMuted(value){this.muted=value;if(this.master)this.master.gain.setTargetAtTime(value?0:.6,this.ctx.currentTime,.02);}
