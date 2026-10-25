@@ -11,7 +11,7 @@
   <link rel="icon" href="vipermix-icon.png?v=83b93f0585" type="image/png">
   <link rel="stylesheet" href="style.css?v=379e116f4a">
   <link rel="stylesheet" href="landscape.css?v=0536fceadf">
-  <link rel="stylesheet" href="theme.css?v=7ad1179cc6">
+  <link rel="stylesheet" href="theme.css?v=601b38b67d">
 </head>
 <body data-state="menu">
   <main class="phone" id="game" data-i18n-aria="game" aria-label="VIPERMIX rhythm game">
@@ -37,12 +37,21 @@
     <input type="file" id="songFile" accept="audio/*,.mp3,.wav,.m4a,.aac,.ogg,.flac,.aiff,.webm" hidden>
     <dialog id="modal"><div id="modalContent"></div></dialog>
   </main>
+  <section class="start-screen" id="startScreen" aria-labelledby="startTitle">
+    <button class="language-button start-language" data-language-toggle aria-label="切换到中文" lang="zh-CN">中文</button>
+    <div class="start-body">
+      <img class="start-logo" src="vipermix-logo.webp?v=496b53aff8" alt="">
+      <h1 class="start-title" id="startTitle">VIPER<span>MIX</span></h1>
+      <p class="start-tag"><span data-i18n="tapHold">TAP. HOLD.</span> <em data-i18n="flow">FLOW.</em></p>
+      <button class="primary-button start-play" id="startButton"><span aria-hidden="true">▶</span><span data-i18n="play">PLAY</span></button>
+    </div>
+  </section>
   <section class="orientation-hint" id="orientationHint" hidden data-i18n-aria="landscape" aria-label="Landscape play">
     <button class="language-button orientation-language" data-language-toggle aria-label="切换到中文" lang="zh-CN">中文</button>
     <svg class="rotate-phone" viewBox="0 0 120 100" aria-hidden="true"><rect x="38" y="19" width="44" height="68" rx="9"/><path d="M55 77h10M28 38C28 19 42 7 60 7c19 0 34 12 34 31M85 29l9 9 8-9"/></svg>
     <h2><span data-i18n="turn">TURN</span><br><em data-i18n="sideways">SIDEWAYS.</em></h2>
     <button class="text-button" id="portraitButton" data-i18n="portrait">PLAY HERE ANYWAY</button>
   </section>
-  <script type="module" src="game.js?v=ad00cee43b"></script>
+  <script type="module" src="game.js?v=d0ea2c8b3e"></script>
 </body>
 </html>

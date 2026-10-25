@@ -179,3 +179,21 @@ dialog .setup-start{gap:10px;width:100%;margin-top:15px}
 .song-card:focus-visible,.song-upload:focus-visible,.difficulty-card:focus-visible,.setup-back:focus-visible{outline:2px solid #e8d7ff;outline-offset:3px}
 @media(orientation:landscape) and (max-height:540px){dialog[data-dialog="tracks"],dialog[data-dialog="difficulty"]{padding:15px 22px;width:min(650px,calc(100% - 32px))}.setup-toolbar{margin-bottom:9px}.setup-toolbar .language-button{height:24px}dialog[data-dialog="tracks"] h2,dialog[data-dialog="difficulty"] h2{font-size:23px;margin-bottom:8px}dialog .setup-intro{font-size:10px;margin-bottom:12px}.song-card,.song-upload{min-height:62px;padding:10px;gap:10px}.song-grid{gap:8px}.selected-track{padding:8px 12px;margin:9px 0;gap:10px}.selected-track strong{font-size:12px}.selected-track small{font-size:7px;margin-bottom:2px}.difficulty-card{min-height:87px;padding:10px;gap:5px}.difficulty-card strong{font-size:11px}.difficulty-card small{font-size:9px}.setup-summary{margin-top:9px;font-size:9px}dialog .setup-start{margin-top:10px;min-height:40px}.menu-caption{font-size:9px;margin-top:10px}}
 @media(max-width:600px) and (orientation:portrait){dialog[data-dialog="tracks"],dialog[data-dialog="difficulty"]{padding:18px}.setup-toolbar{gap:8px}.setup-steps{font-size:8px;gap:5px;letter-spacing:0}.song-grid{grid-template-columns:1fr}.song-card,.song-upload{min-height:70px;padding:12px}.difficulty-cards{gap:7px}.difficulty-card{padding:10px;min-height:105px}.difficulty-card strong{font-size:10px}.difficulty-card small{font-size:9px}dialog[data-dialog="tracks"] h2,dialog[data-dialog="difficulty"] h2{font-size:23px}.menu-caption{font-size:11px}}
+
+/* ---- start screen: the first thing you see, one button to begin ---------- */
+.start-screen{position:fixed;inset:0;z-index:15;display:flex;align-items:center;justify-content:center;padding:24px;
+  background:radial-gradient(ellipse at 50% 42%,#6e329d33,transparent 62%),radial-gradient(ellipse at 50% 110%,#447df422,transparent 60%),linear-gradient(180deg,#150927,#100a21);
+  transition:opacity .35s ease}
+.start-screen.leaving{opacity:0;pointer-events:none}
+.start-screen[hidden]{display:none}
+.start-body{display:flex;flex-direction:column;align-items:center;text-align:center;gap:6px}
+.start-logo{width:min(150px,30vh);height:auto;filter:drop-shadow(0 0 28px #9c5af766);animation:start-float 4s ease-in-out infinite}
+.start-title{margin:4px 0 0;font-family:var(--ui);font-size:clamp(40px,9vh,76px);font-weight:850;letter-spacing:-2px;line-height:1;color:var(--white)}
+.start-title span{background:var(--brand-gradient);background-clip:text;-webkit-background-clip:text;color:transparent}
+.start-tag{margin:6px 0 22px;color:var(--muted);font-size:clamp(13px,2.4vh,17px);font-weight:700;letter-spacing:3px}
+.start-tag em{font-style:normal;color:var(--accent)}
+.start-play{min-width:min(280px,70vw);gap:12px;font-size:20px;letter-spacing:4px;animation:start-pulse 2.2s ease-in-out infinite}
+.start-language{position:absolute;top:max(16px,env(safe-area-inset-top));right:max(16px,env(safe-area-inset-right))}
+@keyframes start-float{50%{transform:translateY(-6px)}}
+@keyframes start-pulse{50%{box-shadow:0 0 0 8px #9c5af722,0 12px 36px #447df444}}
+@media (prefers-reduced-motion:reduce){.start-logo,.start-play{animation:none}.start-screen{transition:none}}
