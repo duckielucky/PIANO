@@ -136,3 +136,46 @@ dialog .import-filename {font-size:16px;color:#eee4ff;font-weight:650;text-align
 @media(orientation:landscape) and (max-height:540px) {dialog[data-dialog="import"]{padding:13px 24px}dialog[data-dialog="import"] h2{font-size:23px;margin:0 0 8px}.audio-dropzone{min-height:110px;gap:6px;padding:10px}.import-hint{margin:6px 0 10px}.audio-waveform{height:34px;margin:10px 0}.menu-overlay .menu-title{margin:10px 0 13px}.menu-overlay .upload-button{min-height:33px;margin-top:8px}.analysis-orbit{margin:0 auto 12px;width:45px;height:45px}.import-filename{margin:9px 0}.menu-overlay .text-button{padding-top:9px}}
 @media(orientation:landscape) and (max-height:350px) {.menu-overlay .menu-title{margin:6px 0 9px}.menu-overlay .menu-title em{font-size:32px}.menu-overlay .upload-button{min-height:30px;padding:6px}.menu-overlay .text-button{padding-top:6px}.menu-overlay .ready-chip{padding:3px 7px}}
 @media(prefers-reduced-motion:reduce) {.analysis-orbit{animation:none}}
+
+/* Main menu followed by song and difficulty selection. */
+.menu-caption{font-size:10px;line-height:1.6;color:#b7a2d2;text-align:center;margin:14px 0 3px}
+body[data-state="menu"] #nextTrack{display:none}
+dialog[data-dialog="tracks"],dialog[data-dialog="difficulty"]{width:min(680px,calc(100% - 32px));max-width:680px;padding:24px 28px}
+.setup-toolbar{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:18px}
+.setup-back{background:none;border:0;color:#cdbce5;font-size:10px;letter-spacing:.4px;padding:7px 0;white-space:nowrap}
+.setup-back:hover{color:white}
+.setup-steps{display:flex;gap:10px;align-items:center;font-size:9px;letter-spacing:1px;color:#8e7caa}
+.setup-steps [aria-current]{color:#e1cbff}
+.setup-steps i{font-style:normal;color:#6c527f}
+.setup-toolbar .language-button{height:28px}
+dialog[data-dialog="tracks"] h2,dialog[data-dialog="difficulty"] h2{margin:0 0 12px;font-size:29px;text-align:left}
+dialog .setup-intro{font-size:11px;margin:0 0 18px;color:#bba6d3}
+.song-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.song-card,.song-upload{display:flex;align-items:center;gap:12px;min-height:86px;padding:15px;margin:0;width:100%;text-align:left;border-radius:12px;border:1px solid #ac88ff33;background:#9c5af710;color:#eee4ff;transition:background .15s,border-color .15s}
+.song-upload{border-style:dashed;background:linear-gradient(135deg,#9c5af727,#447df414)}
+.song-card:hover,.song-upload:hover{background:#9c5af72a;border-color:#c898ff}
+.song-symbol{display:grid!important;place-items:center;flex:0 0 36px;width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#9c5af73b,#447df42b);font-size:20px!important;color:#d9bbff!important;margin:0!important}
+.song-copy{display:block;flex:1;min-width:0;margin:0!important}
+.song-copy strong{display:block;font-size:12px;line-height:1.4;overflow-wrap:anywhere;color:#f1e9ff}
+.song-copy small{display:block;font-size:9px;line-height:1.5;color:#bba6d3;margin-top:4px}
+.song-chevron{font-size:16px!important;margin:0!important;color:#c898ff!important}
+.selected-track{display:flex;align-items:center;gap:12px;background:#9c5af710;border:1px solid #ac88ff22;border-radius:12px;padding:12px 15px;margin:15px 0}
+.selected-track>div{min-width:0}
+.selected-track small{display:block;font-size:8px;letter-spacing:1px;color:#a996c1;margin-bottom:4px}
+.selected-track strong{display:block;font-size:14px;line-height:1.4;overflow-wrap:anywhere;max-height:2.8em;overflow:auto}
+.selected-track div>span{display:block;font-size:10px;color:#bcacd4;margin-top:3px}
+.difficulty-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.difficulty-card{display:flex;flex-direction:column;align-items:flex-start;gap:8px;min-height:114px;padding:15px;border-radius:12px;background:#9c5af70b;border:1px solid #ac88ff2d;color:#c1aed6;text-align:left;transition:background .15s,border-color .15s}
+.difficulty-card:hover{background:#9c5af71b;border-color:#ac88ff77}
+.difficulty-card.selected{border-color:#c898ff;background:linear-gradient(135deg,#9c5af732,#447df419);box-shadow:inset 0 0 0 1px #c898ff44;color:#f6eeff}
+.difficulty-card strong{font-size:12px;letter-spacing:.8px}
+.difficulty-card small{font-size:10px;line-height:1.4;color:#bfaed2}
+.difficulty-bars{display:flex;align-items:flex-end;gap:3px;height:18px}
+.difficulty-bars i{display:block;width:5px;height:7px;background:#584066;border-radius:2px}
+.difficulty-bars i:nth-child(2){height:12px}.difficulty-bars i:nth-child(3){height:18px}.difficulty-bars i.lit{background:linear-gradient(#c898ff,#6d8df1)}
+.setup-summary{display:flex;align-items:center;justify-content:space-between;color:#bda8d6;font-size:10px;margin-top:13px}
+dialog .setup-warning{font-size:10px;line-height:1.4;margin:8px 0 0;color:#c6b0df}
+dialog .setup-start{gap:10px;width:100%;margin-top:15px}
+.song-card:focus-visible,.song-upload:focus-visible,.difficulty-card:focus-visible,.setup-back:focus-visible{outline:2px solid #e8d7ff;outline-offset:3px}
+@media(orientation:landscape) and (max-height:540px){dialog[data-dialog="tracks"],dialog[data-dialog="difficulty"]{padding:15px 22px;width:min(650px,calc(100% - 32px))}.setup-toolbar{margin-bottom:9px}.setup-toolbar .language-button{height:24px}dialog[data-dialog="tracks"] h2,dialog[data-dialog="difficulty"] h2{font-size:23px;margin-bottom:8px}dialog .setup-intro{font-size:10px;margin-bottom:12px}.song-card,.song-upload{min-height:62px;padding:10px;gap:10px}.song-grid{gap:8px}.selected-track{padding:8px 12px;margin:9px 0;gap:10px}.selected-track strong{font-size:12px}.selected-track small{font-size:7px;margin-bottom:2px}.difficulty-card{min-height:87px;padding:10px;gap:5px}.difficulty-card strong{font-size:11px}.difficulty-card small{font-size:9px}.setup-summary{margin-top:9px;font-size:9px}dialog .setup-start{margin-top:10px;min-height:40px}.menu-caption{font-size:9px;margin-top:10px}}
+@media(max-width:600px) and (orientation:portrait){dialog[data-dialog="tracks"],dialog[data-dialog="difficulty"]{padding:18px}.setup-toolbar{gap:8px}.setup-steps{font-size:8px;gap:5px;letter-spacing:0}.song-grid{grid-template-columns:1fr}.song-card,.song-upload{min-height:70px;padding:12px}.difficulty-cards{gap:7px}.difficulty-card{padding:10px;min-height:105px}.difficulty-card strong{font-size:10px}.difficulty-card small{font-size:9px}dialog[data-dialog="tracks"] h2,dialog[data-dialog="difficulty"] h2{font-size:23px}.menu-caption{font-size:11px}}
