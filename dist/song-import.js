@@ -42,5 +42,5 @@ export async function importSong(file,audio,signal,onProgress){
     worker.postMessage({channels,sampleRate:rate},channels.map(channel=>channel.buffer));
   });
   check(signal);
-  return {id,title:file.name.replace(/\.[^.]+$/,'').slice(0,160)||file.name,bpm:analysis.bpm,duration:buffer.duration,buffer,analysis,uploaded:true};
+  return {id,title:file.name.replace(/\.[^.]+$/,'').slice(0,160)||file.name,bpm:analysis.bpm,duration:buffer.duration,buffer,analysis,file,uploaded:true};
 }

@@ -10,8 +10,8 @@
   <title>VIPERMIX — Find your rhythm</title>
   <link rel="icon" href="vipermix-icon.png?v=83b93f0585" type="image/png">
   <link rel="stylesheet" href="style.css?v=379e116f4a">
-  <link rel="stylesheet" href="landscape.css?v=0536fceadf">
-  <link rel="stylesheet" href="theme.css?v=601b38b67d">
+  <link rel="stylesheet" href="landscape.css?v=412d5b5f65">
+  <link rel="stylesheet" href="theme.css?v=1bccc4c1f7">
 </head>
 <body data-state="menu">
   <main class="phone" id="game" data-i18n-aria="game" aria-label="VIPERMIX rhythm game">
@@ -34,7 +34,7 @@
         <button class="text-button" id="helpButton"><span class="button-label" data-i18n="help">HELP</span> <span>?</span></button>
       </div>
     <footer class="track-footer"><button class="track-art" id="trackButton" data-i18n-aria="changeTrack" aria-label="Change track"><svg viewBox="0 0 48 48" aria-hidden="true"><path d="M5 30 17 7 25 29 34 12 43 30 32 39 16 38Z"/><path d="m5 30 20-1 7 10M17 7l-1 31m18-26-9 17 18 1"/></svg></button><div class="track-info"><strong id="trackName">Afterglow</strong><span id="trackDetail">110 BPM · 00:52</span></div><button class="next-track icon-button" id="nextTrack" data-i18n-aria="nextTrack" aria-label="Select next track" data-i18n-title="nextTrack" title="Next track">⌃<span>⌄</span></button><div class="playing-bars" id="playingBars" hidden><i></i><i></i><i></i><i></i></div></footer><div class="song-progress"><div id="songProgress"></div></div>
-    <input type="file" id="songFile" accept="audio/*,.mp3,.wav,.m4a,.aac,.ogg,.flac,.aiff,.webm" hidden>
+    <input type="file" id="songFile" accept="audio/*,.mp3,.wav,.m4a,.aac,.ogg,.flac,.aiff,.webm" multiple hidden>
     <dialog id="modal"><div id="modalContent"></div></dialog>
   </main>
   <section class="start-screen" id="startScreen" aria-labelledby="startTitle">
@@ -52,6 +52,6 @@
     <h2><span data-i18n="turn">TURN</span><br><em data-i18n="sideways">SIDEWAYS.</em></h2>
     <button class="text-button" id="portraitButton" data-i18n="portrait">PLAY HERE ANYWAY</button>
   </section>
-  <script type="module" src="game.js?v=e4fdc54812"></script>
+  <script type="module" src="game.js?v=6eff41104d"></script>
 </body>
 </html>

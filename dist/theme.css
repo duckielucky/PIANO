@@ -73,7 +73,7 @@ dialog .secondary-button:hover {background:#9c5af726}
 @media(max-width:1000px) {.wordmark{font-size:18px}.menu-title span{font-size:13px}.menu-title em{font-size:44px}.menu-title{margin:17px 0 22px}}
 @media(orientation:landscape) and (max-height:540px) {body{background:linear-gradient(180deg,#150927,#100a21)}.phone{box-shadow:none}.menu-title{margin:13px 0 17px}.menu-title em{font-size:43px}.menu-title span{font-size:12px}.ready-chip{padding:5px 9px}.scoreboard strong{font-size:21px}.best-score strong{font-size:14px}.text-button{font-size:8px}dialog h2{font-size:27px;letter-spacing:-1px}.result-grade{font-size:38px}}
 @media(orientation:landscape) and (max-height:350px) {.menu-title em{font-size:35px}.menu-title{margin:8px 0 11px}.ready-chip{padding:4px 8px}}
-@media(max-width:600px) and (orientation:portrait) {.portrait-fallback .menu-overlay{background:linear-gradient(0deg,#100a21 0%,#120a24ee 28%,#15092788 57%,transparent 85%)}.portrait-fallback .menu-title em{font-size:62px}.portrait-fallback .menu-title span{font-size:17px}}
+@media(orientation:portrait) {.portrait-fallback .menu-overlay{background:linear-gradient(0deg,#100a21 0%,#120a24ee 28%,#15092788 57%,transparent 85%)}.portrait-fallback .menu-title em{font-size:62px}.portrait-fallback .menu-title span{font-size:17px}}
 
 /* VIPERMIX identity and a persistent English / 简体中文 selector. */
 .wordmark {display:flex;align-items:center;gap:8px;flex-shrink:0}
@@ -197,3 +197,28 @@ dialog .setup-start{gap:10px;width:100%;margin-top:15px}
 @keyframes start-float{50%{transform:translateY(-6px)}}
 @keyframes start-pulse{50%{box-shadow:0 0 0 8px #9c5af722,0 12px 36px #447df444}}
 @media (prefers-reduced-motion:reduce){.start-logo,.start-play{animation:none}.start-screen{transition:none}}
+
+/* Fill the whole screen on every device: no framed box, with the notch and home bar kept clear. */
+body{padding:0;background:var(--ink)}
+.phone{width:100%;height:100dvh;max-width:none;max-height:none;aspect-ratio:auto;margin:0;border:0;border-radius:0;box-shadow:none;padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right);padding-bottom:env(safe-area-inset-bottom)}
+body.portrait-fallback .phone{max-width:none;padding-left:0;padding-right:0}
+@media(min-width:1400px) and (min-height:820px){.phone{--hud:210px;--menu:280px}}
+
+/* Song list: your saved songs first, then the original tracks. */
+dialog .song-section{display:flex;align-items:center;gap:8px;margin:16px 0 9px;font:700 10px var(--ui);letter-spacing:1.8px;color:#bba6d3}
+dialog .song-section:first-of-type{margin-top:0}
+dialog .song-section span{padding:2px 7px;border-radius:99px;background:#9c5af72a;color:#e8d7ff;letter-spacing:.5px}
+dialog .import-note{margin:0 0 14px;padding:9px 12px;border-radius:10px;background:#447df41c;border:1px solid #79b8ff40;font-size:11px;color:#dcd2f2}
+dialog .import-count{margin:4px 0 0;text-align:center;font-size:10px;letter-spacing:1.6px;color:#bba6d3}
+dialog .song-saved-note{margin:8px 0 0;font-size:10px;color:#9a8cb4}
+.song-item{position:relative;display:flex;min-width:0}
+.song-item .song-card{padding-right:52px}
+.song-item .song-card .song-chevron{display:none}
+.song-remove{position:absolute;top:50%;right:10px;transform:translateY(-50%);min-width:34px;height:34px;padding:0 8px;border-radius:9px;border:1px solid #ac88ff33;background:#120a24cc;color:#bba6d3;font:700 12px var(--ui);letter-spacing:.6px}
+.song-remove:hover{border-color:#ff7b9f;color:#ff9fb8}
+.song-remove.confirm{border-color:#ff7b9f;background:#ff7b9f22;color:#ffc2d1;font-size:10px}
+.song-remove:active:not(:disabled){transform:translateY(-50%) scale(.96)}
+.song-remove:focus-visible{outline:2px solid #e8d7ff;outline-offset:2px}
+.song-copy{min-width:0}
+.song-copy strong{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+@media(orientation:landscape) and (max-height:540px){dialog .song-section{margin:11px 0 7px}dialog .import-note{margin-bottom:10px}}
