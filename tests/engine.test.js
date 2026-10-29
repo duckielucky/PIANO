@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { TRACKS, makeChart, gradeTiming, Run } from '../dist/engine.js';
+import { TRACKS, makeChart, songSection, gradeTiming, Run } from '../dist/engine.js';
 test('timing windows are symmetric and reject off-beat taps',()=>{
   assert.equal(gradeTiming(.07),'perfect');assert.equal(gradeTiming(-.13),'great');assert.equal(gradeTiming(.22),'good');assert.equal(gradeTiming(.28),null);assert.equal(gradeTiming(-.28),null);
 });
@@ -41,5 +41,19 @@ test('Chill continues at zero energy while other difficulties can still fail',()
     const run=new Run(makeChart(TRACKS[0],difficulty),difficulty);
     for(const note of run.notes)run.judge(note,'miss');
     assert.equal(run.energy,0);assert.equal(run.failed,difficulty!=='easy');
+  }
+});
+
+test('built-in charts follow the song: held breakdown, a two-lane drop, busier fills',()=>{
+  for(const track of TRACKS){
+    const beat=60/track.bpm,barOf=n=>Math.floor(n.time/beat/4);
+    for(const difficulty of ['easy','normal','hard']){
+      const chart=makeChart(track,difficulty),in_=section=>chart.filter(n=>songSection(track,barOf(n))===section);
+      assert.ok(in_('breakdown').some(n=>n.type==='hold'),'breakdown has holds');
+      const drop=in_('drop'),chords=drop.filter(n=>drop.filter(m=>m.time===n.time).length===2);
+      assert.equal(chords.length>0,difficulty!=='easy',track.id+'/'+difficulty+' drop chord');
+      const perBar=section=>{const notes=in_(section);return notes.length/new Set(notes.map(barOf)).size;};
+      if(difficulty!=='easy')assert.ok(perBar('fill')>perBar('groove')&&perBar('breakdown')<perBar('groove'));
+    }
   }
 });

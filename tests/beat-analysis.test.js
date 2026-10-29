@@ -1,6 +1,23 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {analyzePcm,makeAudioChart} from '../dist/beat-analysis.js';
+import {analyzePcm,makeAudioChart,beatMap} from '../dist/beat-analysis.js';
+// Playable on a phone: lanes in range, nothing past the end, no lane reused within
+// .18 s of its last note ending, at most two lanes at once (never on Chill), and
+// notes cleared before the next one starts.
+function assertPlayable(chart,analysis,difficulty){
+  const times=[...new Set(chart.map(n=>n.time))];
+  for(const n of chart){
+    assert.ok(n.lane>=0&&n.lane<=3);assert.ok(n.time+n.duration<analysis.duration);
+    const next=chart.find(b=>b!==n&&b.lane===n.lane&&b.time>=n.time);
+    if(next)assert.ok(next.time-n.time-n.duration>=.18,'lane reused too soon at '+n.time);
+  }
+  for(const time of times){
+    const together=chart.filter(n=>n.time===time);
+    assert.ok(together.length<=(difficulty==='easy'?1:2),'too many lanes at '+time);
+    const after=times.find(t=>t>time),end=Math.max(...together.map(n=>n.time+n.duration));
+    if(after!==undefined)assert.ok(after-end>=.1,'no gap after '+time);
+  }
+}
 const rate=11025;
 function drumTrack(times,duration=24){
   const samples=new Float32Array(rate*duration);
@@ -51,11 +68,7 @@ test('chart difficulty stays playable and restart returns fresh notes',()=>{
   for(const difficulty of ['easy','normal','hard']){
     const chart=makeAudioChart(analysis,difficulty);
     assert.ok(chart.length>=previous);previous=chart.length;
-    for(let i=0;i<chart.length;i++){
-      const n=chart[i];assert.ok(n.lane>=0&&n.lane<=3);
-      assert.ok(n.time+n.duration<analysis.duration);
-      if(i+1<chart.length)assert.ok(chart[i+1].time-n.time-n.duration>=.18);
-    }
+    assertPlayable(chart,analysis,difficulty);
     const again=makeAudioChart(analysis,difficulty);assert.deepEqual(chart,again);
     chart[0].status='hit';assert.equal(again[0].status,'pending');
   }
@@ -78,4 +91,38 @@ test('notes follow the beat, not every sound in the song',()=>{
     const onBeat=chart.filter(n=>kicks.some(k=>Math.abs(k-n.time)<.035)).length/chart.length;
     assert.ok(onBeat>=.95,difficulty+' notes on the beat: '+onBeat.toFixed(2));
   }
+});
+
+test('the chart rises and falls with the song: calm verse, busy chorus',()=>{
+  // Verse: a soft kick on each beat over a held pad. Chorus: hard kick, snare on
+  // 2 and 4, hi-hats on every eighth. Then the verse returns.
+  const bpm=100,beat=60/bpm,duration=48,samples=new Float32Array(rate*duration);
+  const hit=(time,freq,amp,decay)=>{for(let i=0;i<rate*.12;i++){const k=Math.round(time*rate)+i;if(k<samples.length)samples[k]+=amp*Math.sin(i/rate*2*Math.PI*freq)*Math.exp(-i/rate*decay);}};
+  const chorus=t=>t>=16&&t<32;
+  for(let i=0;i<samples.length;i++){const t=i/rate;if(!chorus(t))samples[i]+=.15*Math.sin(2*Math.PI*220*t);}
+  for(let n=0,t=.5;t<duration-.5;n++,t=.5+n*beat){
+    if(chorus(t)){hit(t,70,.9,30);if(n%2)hit(t,1800,.5,45);hit(t+beat/2,6000,.35,90);}
+    else hit(t,70,.35,30);
+  }
+  const analysis=analyzePcm([samples],rate),map=beatMap(analysis);
+  assert.ok(Math.abs(analysis.bpm-bpm)<=2,'tempo '+analysis.bpm);
+  const levelAt=time=>map.levels[map.beats.reduce((best,b,k)=>Math.abs(b-time)<Math.abs(map.beats[best]-time)?k:best,0)];
+  assert.ok(map.beats.filter(b=>b>18&&b<30).every(b=>levelAt(b)===2),'chorus reads as the peak');
+  assert.ok(map.beats.filter(b=>b>3&&b<14).every(b=>levelAt(b)===0),'verse reads as calm');
+  for(const difficulty of ['easy','normal','hard']){
+    const chart=makeAudioChart(analysis,difficulty);assertPlayable(chart,analysis,difficulty);
+    const rate=(from,to)=>new Set(chart.filter(n=>n.time>=from&&n.time<to).map(n=>n.time)).size/(to-from);
+    assert.ok(rate(17,31)>=rate(2,15)*1.6,difficulty+' chorus busier than verse: '+rate(17,31).toFixed(2)+' vs '+rate(2,15).toFixed(2));
+    const verseHolds=chart.filter(n=>n.type==='hold'&&!chorus(n.time)).length,chords=chart.length-new Set(chart.map(n=>n.time)).size;
+    assert.ok(verseHolds>0,difficulty+' holds over the sustained verse');
+    if(difficulty==='easy')assert.equal(chords,0);
+    else{
+      assert.ok(chords>0,difficulty+' has chords');
+      assert.ok(chart.every(n=>chart.filter(m=>m.time===n.time).length<2||chorus(n.time)),'chords only in the chorus');
+    }
+    // Every note is on the beat, or on the half-beat hi-hat in the chorus.
+    for(const n of chart){const off=((n.time-.5)/beat%.5+.5)%.5;assert.ok(Math.min(off,.5-off)*beat<.04,difficulty+' note off the grid at '+n.time.toFixed(2));}
+  }
+  const lanes=[0,1,2,3].map(l=>makeAudioChart(analysis,'hard').filter(n=>n.lane===l).length);
+  assert.ok(Math.min(...lanes)>=Math.max(...lanes)*.4,'all four lanes used: '+lanes);
 });

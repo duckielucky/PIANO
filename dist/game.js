@@ -1,7 +1,7 @@
-import { TRACKS, WINDOWS, makeChart, gradeTiming, gradeAccuracy, Run } from './engine.js?v=e79a57a318';
+import { TRACKS, WINDOWS, makeChart, trackMap, gradeTiming, gradeAccuracy, Run } from './engine.js?v=63c8d4c72d';
 import { Soundtrack } from './audio.js?v=71ed956385';
-import { makeAudioChart } from './beat-analysis.js?v=3ab60c8f1e';
-import { importSong } from './song-import.js?v=8d0e310673';
+import { makeAudioChart, beatMap } from './beat-analysis.js?v=935406f2a6';
+import { importSong } from './song-import.js?v=065e601946';
 import { listSongs, saveSong, deleteSong, MAX_SONGS } from './song-library.js?v=8ebd178751';
 import { chooseLanguage, translate } from './i18n.js?v=548c55d4bf';
 
@@ -143,6 +143,13 @@ function setMode(next){mode=next;document.body.dataset.state=next;syncOrientatio
 function pop(element){if(!reducedMotion)element.animate([{transform:'scale(1.13)'},{transform:'scale(1)'}],{duration:200,easing:'ease-out'});}
 const reducedMotion=matchMedia('(prefers-reduced-motion: reduce)').matches;
 const travel=()=>difficulty==='hard'?2.2:difficulty==='easy'?3.25:2.75;
+// The song's beats and how hard each bar hits, worked out once per song.
+const beatGrid=item=>item.beatGrid??=(item.uploaded?beatMap(item.analysis):trackMap(item));
+function beatAt(grid,t){
+  let lo=0,hi=grid.beats.length-1;if(hi<0||t<grid.beats[0])return {k:-1,since:9,level:1,bar:false};
+  while(lo<hi){const mid=(lo+hi+1)>>1;if(grid.beats[mid]<=t)lo=mid;else hi=mid-1;}
+  return {k:lo,since:t-grid.beats[lo],level:grid.levels[lo],bar:((lo-grid.downbeat)%4+4)%4===0};
+}
 const duration=()=>track.duration??track.bars*4*60/track.bpm;
 const bestKey=()=>`neon-rush-tap-hold-best-${track.id}-${difficulty}`;
 function readBest(){try{return Number(localStorage.getItem(bestKey()))||0;}catch{return 0;}}
@@ -180,20 +187,36 @@ function highway(t){
     if(lane%2===0)polygon([project(0,lane/4),project(0,(lane+1)/4),project(1.14,(lane+1)/4),project(1.14,lane/4)],'#ffffff02');
     if(flashes[lane]>0){const g=ctx.createLinearGradient(0,height*.35,0,height*.87);g.addColorStop(0,'#79b8ff00');g.addColorStop(1,`rgba(121,184,255,${flashes[lane]*.22})`);polygon([project(.1,lane/4),project(.1,(lane+1)/4),project(1.08,(lane+1)/4),project(1.08,lane/4)],g);}
   }
-  const bt=60/track.bpm;
-  for(let i=0;i<12;i++){
-    const f=((i/12+(t/bt*.045))%1+1)%1;
-    line(project(f,0),project(f,1),`rgba(160,125,207,${.035+f*.065})`);
+  const grid=run&&['playing','countdown','paused'].includes(mode)?beatGrid(track):null, now=grid?beatAt(grid,t):null;
+  if(grid){
+    // Beat lines travel down with the notes, so the pulse is visible before it is heard; bar lines are brighter.
+    const ahead=travel()*1.14;
+    for(let k=Math.max(0,now.k);k<grid.beats.length&&grid.beats[k]<=t+ahead;k++){
+      const f=1-(grid.beats[k]-t)/travel(),bar=((k-grid.downbeat)%4+4)%4===0;if(f<0||f>1.14)continue;
+      line(project(f,0),project(f,1),bar?`rgba(200,152,255,${.1+f*.32})`:`rgba(160,125,207,${.04+f*.1})`,bar?1.6:1);
+    }
+  }else{
+    const bt=60/track.bpm;
+    for(let i=0;i<12;i++){
+      const f=((i/12+(t/bt*.045))%1+1)%1;
+      line(project(f,0),project(f,1),`rgba(160,125,207,${.035+f*.065})`);
+    }
   }
-  for(let lane=0;lane<=4;lane++)line(project(0,lane/4),project(1.12,lane/4),lane===0||lane===4?'#aa7fe95a':'#8261ac30',lane===0||lane===4?1.4:1);
-  const beatPulse=reducedMotion?0:(1+Math.cos(t/bt*Math.PI*2))*.5;
-  ctx.shadowColor='#91baff';ctx.shadowBlur=10+beatPulse*7;line(project(1,0),project(1,1),'#ac9aff99',1.5);ctx.shadowBlur=0;
+  // Every beat lands as a flash on the hit line and the highway edges: harder on
+  // the first beat of a bar, and harder again when the song is at its peak.
+  const pulse=now&&!reducedMotion&&t>=0?Math.exp(-now.since*7)*(now.bar?1:.55)*[.55,.85,1.2][now.level]:0;
+  for(let lane=0;lane<=4;lane++)line(project(0,lane/4),project(1.12,lane/4),lane===0||lane===4?`rgba(170,127,233,${.35+pulse*.5})`:'#8261ac30',lane===0||lane===4?1.4+pulse*1.2:1);
+  ctx.shadowColor='#91baff';ctx.shadowBlur=10+pulse*20;line(project(1,0),project(1,1),`rgba(172,154,255,${.6+pulse*.4})`,1.5+pulse*1.5);ctx.shadowBlur=0;
+  if(pulse>.02&&now.level===2){
+    // At the peak, stage lights at both sides answer each beat.
+    for(const side of [0,1]){const x=side?width:0,glow=ctx.createRadialGradient(x,height*.55,0,x,height*.55,width*.42);glow.addColorStop(0,(now.k%2===side?'rgba(200,152,255,':'rgba(121,184,255,')+(pulse*.22)+')');glow.addColorStop(1,'rgba(18,10,36,0)');ctx.fillStyle=glow;ctx.fillRect(side?width*.5:0,0,width*.5,height);}
+  }
   for(let lane=0;lane<4;lane++){
     const a=project(1.025,(lane+.06)/4),b=project(1.025,(lane+.94)/4),bw=b.x-a.x;
     const active=mode==='playing'&&isLaneDown(lane);
     const g=ctx.createLinearGradient(0,a.y,0,a.y+height*.07);g.addColorStop(0,active?'#79b8ff66':flashes[lane]>.1?'#697de455':'#3a235d44');g.addColorStop(1,'#160d2d');
     roundRect(a.x,a.y,bw,height*.075,7,g,active||flashes[lane]>.1?'#c4b7ff':'#79629a80');
-    roundRect(a.x+10,a.y+3,bw-20,2,1,'#79b8ff44');
+    roundRect(a.x+10,a.y+3,bw-20,2,1,`rgba(121,184,255,${.27+pulse*.55})`);
   }
   const fog=ctx.createLinearGradient(0,0,0,height*.22);fog.addColorStop(0,'#120a24');fog.addColorStop(1,'#120a2400');ctx.fillStyle=fog;ctx.fillRect(0,0,width,height*.22);
 }

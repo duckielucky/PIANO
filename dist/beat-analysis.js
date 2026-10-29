@@ -119,43 +119,114 @@ export function trackBeats(analysis){
   return {bpm:60/(period*FRAME),beats:frames.map(f=>f*FRAME)};
 }
 
-export function makeAudioChart(analysis,difficulty='easy'){
-  const {bpm,beats}=trackBeats(analysis), beat=60/bpm, events=analysis.events||[];
-  // A note sits on a beat, and on the real sound that marks it: the strongest
-  // attack within a short window of the beat. A beat with no sound gets no note.
-  const near=(time,window)=>{
+// Events are in time order, so a binary search finds the first one at or after a time.
+function firstFrom(events,time){let lo=0,hi=events.length;while(lo<hi){const mid=(lo+hi)>>1;if(events[mid].time<time)lo=mid+1;else hi=mid;}return lo;}
+// The real sound that marks a moment: the strongest attack within a short window of it.
+function nearFinder(events){
+  return (time,window)=>{
     let pick=null;
-    for(const event of events){
-      if(event.time<time-window)continue;if(event.time>time+window)break;
+    for(let i=firstFrom(events,time-window);i<events.length&&events[i].time<=time+window;i++){
+      const event=events[i];
       if(!pick||event.strength>pick.strength*1.25||(event.strength>=pick.strength*.8&&Math.abs(event.time-time)<Math.abs(pick.time-time)))pick=event;
     }
     return pick;
   };
-  // Which beat of the bar is the downbeat: the one the bass lands on most.
+}
+
+// The song's map, beat by beat: where each beat falls, which beat starts the
+// bar, and how hard each bar hits (0 calm, 1 groove, 2 peak) compared with the
+// rest of the same song. Charts and the highway's pulse both follow it.
+export function beatMap(analysis){
+  const {bpm,beats}=trackBeats(analysis), beat=60/bpm, events=analysis.events||[], near=nearFinder(events);
+  // The downbeat is the beat of the bar the bass lands on most.
   const bassOn=[0,0,0,0];
   beats.forEach((time,k)=>{const e=near(time,.07);if(e&&e.band===0)bassOn[k%4]+=e.strength;});
-  const downbeat=bassOn.indexOf(Math.max(...bassOn)), half=Math.max(.04,Math.min(.07,beat*.12));
-  const slots=[];
+  const downbeat=bassOn.indexOf(Math.max(...bassOn)), barOf=k=>Math.floor((k-downbeat)/4);
+  // How hard a bar hits: the attack strength heard around each of its beats.
+  const totals=new Map();
   beats.forEach((time,k)=>{
-    const bar=((k-downbeat)%4+4)%4;
-    if(difficulty==='easy'&&bar%2)return;
-    slots.push(time);
-    if(difficulty==='hard'&&beats[k+1])slots.push((time+beats[k+1])/2);
+    let sum=0;for(let i=firstFrom(events,time-2*beat);i<events.length&&events[i].time<=time+2*beat;i++)sum+=events[i].strength;
+    const bar=totals.get(barOf(k))||{sum:0,count:0};bar.sum+=sum;bar.count++;totals.set(barOf(k),bar);
   });
-  const gap=difficulty==='easy'?.58:difficulty==='hard'?.18:.3;
-  const selected=[];
-  for(const slot of slots){
-    const isHalf=difficulty==='hard'&&!beats.some(b=>Math.abs(b-slot)<1e-6);
-    const event=near(slot,isHalf?.05:half);
-    if(!event||event.time<.04||event.time>analysis.duration-.25)continue;
-    if(selected.length&&(event===selected.at(-1)||event.time-selected.at(-1).time<gap))continue;
-    selected.push(event);
+  const sorted=[...totals.values()].map(bar=>bar.sum/bar.count).sort((a,b)=>a-b), q=p=>sorted[Math.floor(p*(sorted.length-1))]??0;
+  // Compared with the song's own quiet and loud ends, so a long verse stays calm and a long chorus stays a peak.
+  const floor=q(.1), roof=q(.9), calm=floor+(roof-floor)*.35, peak=floor+(roof-floor)*.68, even=roof-floor<q(.5)*.25;
+  const levels=beats.map((_,k)=>{const bar=totals.get(barOf(k)),v=bar.sum/bar.count;return even?1:v<=calm?0:v>=peak?2:1;});
+  return {bpm,beat,beats,levels,downbeat};
+}
+
+// How each difficulty fills a beat at each level: [play every n-th beat, notes per beat].
+const PLAN={easy:[[4,1],[2,1],[1,1]],normal:[[2,1],[1,1],[1,2]],hard:[[1,1],[1,2],[1,4]]};
+const GAP={easy:.45,normal:.2,hard:.11};
+
+export function makeAudioChart(analysis,difficulty='easy'){
+  const map=beatMap(analysis), {beat,beats,levels,downbeat}=map, events=analysis.events||[], near=nearFinder(events);
+  const plan=PLAN[difficulty]||PLAN.easy, gap=GAP[difficulty]||GAP.easy, easy=difficulty==='easy';
+  const strengths=events.map(e=>e.strength).sort((a,b)=>a-b), strong=p=>strengths[Math.floor(p*(strengths.length-1))]??0;
+  const accent=strong(.5), sharp=strong(.6), end=analysis.duration-.25;
+  const window=Math.max(.04,Math.min(.07,beat*.12)), heard=beats.map(time=>!!near(time,window));
+  // Steady: at least three of the four beats around this one have their own attack.
+  const steady=k=>[k-2,k-1,k+1,k+2].filter(j=>heard[j]).length>=3;
+  // Every note sits on a beat, or a step of one, and on the real sound there;
+  // calm bars thin out, peak bars add off-beats, so the chart rises and falls with the song.
+  const picked=[];
+  beats.forEach((time,k)=>{
+    const level=levels[k], [every,steps]=plan[level], bar=((k-downbeat)%4+4)%4;
+    if(bar%every)return;
+    const span=(beats[k+1]??time+beat)-time;
+    for(let step=0;step<steps;step++){
+      const slot=time+span*step/steps, onBeat=step===0;
+      let event=near(slot,onBeat?Math.max(.04,Math.min(.07,beat*.12)):Math.min(.05,span/steps*.3));
+      // A soft beat inside a steady groove still gets its note, right on the beat.
+      if(!event&&onBeat&&level>0&&steady(k))event={time:slot,strength:0,band:1,sustain:0};
+      if(!event||event.time<.04||event.time>end)continue;
+      if(steps===4&&step%2&&event.strength<sharp)continue;
+      const last=picked.at(-1);
+      if(last&&(event===last.event||event.time-last.event.time<gap))continue;
+      picked.push({event,k,bar,level,onBeat});
+    }
+  });
+  // Big hits get a second lane: the first downbeat of a peak, then downbeats
+  // (and on Expert, strong bass on beat 3) while the peak lasts.
+  picked.forEach(note=>{
+    const {event,k,bar,level,onBeat}=note;
+    if(easy||level<2||!onBeat||event.strength<accent)return;
+    const drop=levels[Math.max(0,k-4)]<2, barIndex=Math.floor((k-downbeat)/4);
+    note.chord=bar===0&&(drop||difficulty==='hard'||barIndex%2===0)||difficulty==='hard'&&bar===2&&event.band===0;
+  });
+  // In a calm bar, a sustained first beat becomes a long note that takes over the beat after it.
+  if(!easy)for(let i=0;i<picked.length-1;i++){
+    const note=picked[i];
+    if(note.level===0&&note.bar===0&&note.onBeat&&!note.chord&&(note.event.sustain??0)>=.75*beat&&picked[i+1].event.time-note.event.time<1.1*beat)picked.splice(i+1,1);
   }
-  const phrase=[0,2,1,3,2,0,3,1];
-  return selected.map((event,i)=>{
-    const next=selected[i+1]?.time??analysis.duration,space=next-event.time;
-    const holdLength=Math.min(beat,event.sustain??0,space-.24,analysis.duration-event.time-.1);
-    const hold=i%7===4&&holdLength>=.3;
-    return {id:i,lane:(phrase[i%phrase.length]+(event.band??1))%4,time:event.time,type:hold?'hold':'tap',duration:hold?holdLength:0,status:'pending'};
+  // Long notes ride sustained sounds when there is room before the next note.
+  let sinceHold=9;
+  picked.forEach((note,i)=>{
+    const room=(picked[i+1]?.event.time??analysis.duration)-note.event.time;
+    const length=Math.min(2*beat,room-(easy?.4:.25),analysis.duration-note.event.time-.1);
+    note.hold=!note.chord&&room>=1.5*beat&&(note.event.sustain??0)>=.75*beat&&(note.level===0?note.bar===0||sinceHold>=2:sinceHold>=4)&&length>=Math.max(.3,.6*beat);
+    note.length=note.hold?length:0;sinceHold=note.hold?0:sinceHold+1;
   });
+  // Lanes follow the melody's direction: a higher sound steps right, a lower
+  // one steps left, bouncing off the edges so every lane gets used. Quick runs
+  // climb one lane at a time like stairs, and no lane is hit twice in a row.
+  const free=[-9,-9,-9,-9], notes=[];let lane=1,last=[],before=-1,dir=1,band=1,previous=-9;
+  picked.forEach(({event,chord,hold,length},i)=>{
+    const time=event.time, fast=time-previous<beat*.6, open=l=>l>=0&&l<4&&!last.includes(l)&&time-free[l]>=.18;
+    const pitch=event.strength?event.band??1:band;
+    if(pitch!==band)dir=pitch>band?1:-1;
+    const step=fast||i%3!==2?1:2;
+    let pick=lane+dir*step;
+    if(pick<0||pick>3)pick=lane+dir;
+    if(pick<0||pick>3){dir=-dir;pick=lane+dir*step;}
+    // Back-and-forth between the same two lanes moves on to a third.
+    if(pick===before&&[0,1,2,3].some(l=>open(l)&&l!==before))pick=[0,1,2,3].filter(l=>open(l)&&l!==before).sort((a,b)=>Math.abs(a-pick)-Math.abs(b-pick))[0];
+    if(!open(pick))pick=[0,1,2,3].filter(open).sort((a,b)=>Math.abs(a-pick)-Math.abs(b-pick))[0]??pick;
+    const add=l=>{notes.push({lane:l,time,type:hold?'hold':'tap',duration:hold?length:0,status:'pending'});free[l]=time+(hold?length:0);};
+    add(pick);
+    if(chord){const second=[0,1,2,3].filter(l=>l!==pick&&!last.includes(l)&&time-free[l]>=.18).sort((a,b)=>Math.abs(b-pick)-Math.abs(a-pick))[0];last=[pick];if(second!==undefined){add(second);last.push(second);}}else last=[pick];
+    if(pick!==lane)dir=pick>lane?1:-1;
+    before=lane;lane=pick;band=pitch;previous=time;
+  });
+  return notes.sort((a,b)=>a.time-b.time||a.lane-b.lane).map((note,id)=>({id,...note}));
 }
