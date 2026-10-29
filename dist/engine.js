@@ -36,21 +36,30 @@ const STEPS = {
   normal: { groove: [0,2,4,6], fill: [0,2,4,5,6,7], breakdown: [0,4], drop: [0,2,4,6] },
   hard: { groove: [0,2,3,4,6,7], fill: [0,1,2,3,4,5,6,7], breakdown: [0,4,6], drop: [0,2,3,4,6,7] },
 };
+// The soundtrack's lead plays one of these steps (semitones above its root) on
+// every eighth note, moving one step along every four bars (see audio.js).
+export const MELODY = [0,7,12,3,10,7,15,12];
+export const melodyNote = (bar, step) => MELODY[(bar * 8 + step + Math.floor(bar / 4)) % 8];
 export function makeChart(track, difficulty = 'easy') {
   const beat = 60 / track.bpm, notes = [], plan = STEPS[difficulty] || STEPS.easy, map = trackMap(track);
-  const phrases = [[0,2,1,3,2,1,0,3],[1,0,3,2,0,2,3,1],[3,1,2,0,1,3,2,0],[2,3,0,1,3,0,1,2]];
   // Holds never compete with a second note in their own lane.
   const held = (lane, time) => notes.some(n => n.lane === lane && n.type === 'hold' && time <= n.time + n.duration + .2);
+  // Lanes play the lead like piano keys: higher notes further right, a step up
+  // always moves right, a step down always moves left, a repeat stays put.
+  let last = null, previous = 1;
   for (let bar = 1; bar < track.bars - 1; bar++) {
-    const phrase = phrases[bar % 4], section = songSection(track, bar), peak = map.levels[bar * 4] === 2;
-    plan[section].forEach((step, i) => {
-      let lane = phrase[i % 8], type = 'tap', duration = 0;
+    const section = songSection(track, bar), peak = map.levels[bar * 4] === 2;
+    plan[section].forEach(step => {
+      const note = melodyNote(bar, step);
+      let lane = Math.round(note / 15 * 3), type = 'tap', duration = 0;
+      if (last !== null) lane = note === last ? previous : note > last ? Math.max(lane, Math.min(3, previous + 1)) : Math.min(lane, Math.max(0, previous - 1));
       // Long notes ride the breakdown's held chords, and close every other phrase.
       if (section === 'breakdown' && step === 0) { type = 'hold'; duration = beat * (difficulty === 'easy' ? 2 : 1.5); }
       else if (step === (difficulty === 'easy' ? 4 : 6) && bar % 4 === 2) { type = 'hold'; duration = beat; }
       const time = (bar * 4 + step / 2) * beat;
-      if (held(lane, time)) lane = (lane + 1) % 4;
+      if (held(lane, time)) lane = [0,1,2,3].filter(l => !held(l, time)).sort((x, y) => Math.abs(x - lane) - Math.abs(y - lane))[0] ?? lane;
       notes.push({ id: notes.length, lane, time, type, duration, status: 'pending' });
+      last = note; previous = lane;
       // The drop, and the downbeats of the loud finish, hit two lanes at once.
       const chord = difficulty !== 'easy' && step === 0 && (section === 'drop' || peak && bar % (difficulty === 'hard' ? 2 : 4) === 0);
       if (chord) { let second = (lane + 2) % 4; if (held(second, time)) second = (second + 1) % 4; if (second !== lane) notes.push({ id: notes.length, lane: second, time, type: 'tap', duration: 0, status: 'pending' }); }

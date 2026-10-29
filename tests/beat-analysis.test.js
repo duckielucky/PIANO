@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {analyzePcm,makeAudioChart,beatMap} from '../dist/beat-analysis.js';
+import {analyzePcm,makeAudioChart,beatMap,ANALYSIS_VERSION} from '../dist/beat-analysis.js';
 // Playable on a phone: lanes in range, nothing past the end, no lane reused within
 // .18 s of its last note ending, at most two lanes at once (never on Chill), and
 // notes cleared before the next one starts.
@@ -123,8 +123,9 @@ test('the chart rises and falls with the song: calm verse, busy chorus',()=>{
     // Every note is on the beat, or on the half-beat hi-hat in the chorus.
     for(const n of chart){const off=((n.time-.5)/beat%.5+.5)%.5;assert.ok(Math.min(off,.5-off)*beat<.04,difficulty+' note off the grid at '+n.time.toFixed(2));}
   }
+  // The verse holds one pitch, so lanes gather where the tune is, but every lane still gets used.
   const lanes=[0,1,2,3].map(l=>makeAudioChart(analysis,'hard').filter(n=>n.lane===l).length);
-  assert.ok(Math.min(...lanes)>=Math.max(...lanes)*.4,'all four lanes used: '+lanes);
+  assert.ok(Math.min(...lanes)>0,'all four lanes used: '+lanes);
 });
 
 test('a syncopated groove keeps its real tempo and the beat lands on the snare and kick',()=>{
@@ -142,8 +143,40 @@ test('a syncopated groove keeps its real tempo and the beat lands on the snare a
   }
   const analysis=analyzePcm([samples],rate);
   assert.ok(Math.abs(analysis.bpm-bpm)<=2,'tempo '+analysis.bpm);
-  assert.equal(analysis.version,2);
+  assert.equal(analysis.version,ANALYSIS_VERSION);
   const beats=analysis.beats.filter(b=>b>2&&b<duration-3);
   const onGrid=beats.filter(b=>onBeat.some(t=>Math.abs(t-b)<.04)).length/beats.length;
   assert.ok(onGrid>=.95,'beats on the groove: '+onGrid.toFixed(2));
+});
+
+test('lanes follow the tune: higher notes to the right, lower to the left, repeats stay',()=>{
+  // A piano-like tune in C major over a kick, one note per beat.
+  const bpm=100,beat=60/bpm,tune=[60,64,67,72,67,64,62,62,65,69,72,69,67,64,60,60,64,67,71,74,72,67,64,60];
+  const duration=4*tune.length*beat/2+2,samples=new Float32Array(rate*duration),played=[];
+  for(let n=0;n*beat<duration-1.5;n++){
+    const t=.5+n*beat,note=tune[n%tune.length],f=440*Math.pow(2,(note-69)/12);played.push({time:t,note});
+    for(let i=0;i<rate*beat*.9;i++){const k=Math.round(t*rate)+i,x=i/rate;if(k>=samples.length)break;
+      let tone=0;for(let h=1;h<=5;h++)tone+=Math.sin(2*Math.PI*f*h*x)/h;
+      samples[k]+=.25*tone*Math.exp(-x*3)+(x<.12?.6*Math.sin(2*Math.PI*60*x)*Math.exp(-x*30):0);}
+  }
+  const analysis=analyzePcm([samples],rate);
+  assert.equal(analysis.key.name+' '+analysis.key.mode,'C major');
+  const sung=analysis.events.filter(e=>e.pitch!==null);
+  assert.ok(sung.length>=played.length*.9,'notes with a pitch: '+sung.length+' of '+played.length);
+  const right=sung.filter(e=>{const p=played.find(p=>Math.abs(p.time-e.time)<.05);return p&&Math.abs(p.note-e.pitch)<=.5;}).length;
+  assert.ok(right>=sung.length*.9,'pitches heard right: '+right+' of '+sung.length);
+  for(const difficulty of ['easy','normal','hard']){
+    const chart=makeAudioChart(analysis,difficulty);assertPlayable(chart,analysis,difficulty);
+    const single=chart.filter(n=>chart.filter(m=>m.time===n.time).length===1);
+    let agree=0,pairs=0;
+    for(let i=1;i<single.length;i++){
+      const a=played.find(p=>Math.abs(p.time-single[i-1].time)<.05),b=played.find(p=>Math.abs(p.time-single[i].time)<.05);
+      if(!a||!b||single[i].time-single[i-1].time>2*beat)continue;
+      // At the edge of the keys a further step up (or down) has nowhere to go, so staying there counts.
+      const move=Math.sign(single[i].lane-single[i-1].lane),edge=b.note>a.note?single[i-1].lane===3:b.note<a.note&&single[i-1].lane===0;
+      pairs++;if(Math.sign(b.note-a.note)===move||edge&&move===0)agree++;
+    }
+    assert.ok(pairs>8&&agree>=pairs*.85,difficulty+' lanes move with the tune: '+agree+' of '+pairs);
+    assert.ok(new Set(chart.map(n=>n.lane)).size===4,difficulty+' uses every lane');
+  }
 });

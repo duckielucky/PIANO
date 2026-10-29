@@ -1,6 +1,6 @@
 // Audio-derived onsets, not a fixed/random chart. Runs in a worker in the browser.
 // Saved songs analysed by an older version are analysed again when picked.
-export const ANALYSIS_VERSION=2;
+export const ANALYSIS_VERSION=3;
 export function analyzePcm(channels, sampleRate, onProgress = () => {}) {
   const length=channels[0]?.length||0, hop=Math.max(1,Math.round(sampleRate*.01));
   const frameCount=Math.ceil(length/hop), dt=hop/sampleRate;
@@ -72,18 +72,21 @@ export function analyzePcm(channels, sampleRate, onProgress = () => {}) {
   }
   // The beat grid, then lined up with the song's own attacks: the pulse peaks a
   // little before the sound is heard, so the grid moves by the typical gap.
-  const pulse=pulseBeats(spectralFlux(channels,sampleRate,p=>onProgress(.45+.5*p))), near=nearFinder(events);
+  const pulse=pulseBeats(spectralFlux(channels,sampleRate,p=>onProgress(.45+.35*p))), near=nearFinder(events);
   const gaps=pulse.beats.map(time=>near(time,.06)?.time-time).filter(Number.isFinite).sort((a,b)=>a-b);
   const shift=Math.max(-.04,Math.min(.04,gaps[gaps.length>>1]??0));
   const beats=pulse.beats.map(time=>Math.round((time+shift)*1000)/1000).filter(time=>time>=0&&time<duration);
   // The tempo shown for the song is the one its notes follow.
   const tempo=pulse.bpm;bpm=Math.round(tempo);
+  const melody=melodyTrack(channels,sampleRate,p=>onProgress(.8+.17*p));
+  for(const event of events)event.pitch=pitchAt(melody,event.time);
+  const key=songKey(channels,sampleRate);
   const waveform=Array.from({length:96},(_,i)=>{
     let value=0;for(let j=Math.floor(i*frameCount/96);j<Math.floor((i+1)*frameCount/96);j++)value=Math.max(value,energy[j]);
     return value/maxEnergy;
   });
   onProgress(1);
-  return {version:ANALYSIS_VERSION,bpm,tempo,beats,confidence,weakBeat,events,waveform,duration};
+  return {version:ANALYSIS_VERSION,bpm,tempo,beats,confidence,weakBeat,events,key,melody,waveform,duration};
 }
 
 // The beat itself. The song's sound is split into 48 bands from 40 Hz to
@@ -159,6 +162,100 @@ export function pulseBeats(pulse){
   const frames=[];for(let i=end;i>=0;i=back[i])frames.push(i);
   frames.reverse();
   return {bpm:60/(period*FRAME),beats:frames.map(f=>f*FRAME)};
+}
+// The notes. Just after each attack the sound is split into its pitches, and the
+// pitch whose harmonics ring loudest (usually the singer or the lead) is that
+// note's pitch, in semitones (MIDI numbers: 60 is middle C). Drum hits have no
+// clear pitch and stay unpitched. Across the whole song the same pitches, folded
+// into one octave, give its key.
+const PITCH_SIZE=4096, PITCH_WINDOW=1024, LOW_NOTE=48, HIGH_NOTE=84, HARMONICS=10;
+const hz=note=>440*Math.pow(2,(note-69)/12);
+// A short window (93 ms), padded out so peaks can be placed between bins.
+function spectrumReader(channels,sampleRate,size=PITCH_WINDOW){
+  const length=channels[0]?.length||0, re=new Float64Array(PITCH_SIZE), im=new Float64Array(PITCH_SIZE), mag=new Float64Array(PITCH_SIZE/2);
+  const window=Float32Array.from({length:size},(_,i)=>.5-.5*Math.cos(2*Math.PI*i/size));
+  return time=>{
+    mag.fill(0);const begin=Math.round(time*sampleRate-size/2);
+    for(const pcm of channels){
+      re.fill(0);im.fill(0);
+      for(let i=0;i<size;i++){const k=begin+i;if(k>=0&&k<length)re[i]=pcm[k]*window[i];}
+      fft(re,im);
+      for(let k=0;k<PITCH_SIZE/2;k++)mag[k]+=re[k]*re[k]+im[k]*im[k];
+    }
+    for(let k=0;k<PITCH_SIZE/2;k++)mag[k]=Math.sqrt(mag[k]);
+    return mag;
+  };
+}
+// Only spectral peaks count, each against the level around it, so a loud kick or a wash of noise doesn't read as a note.
+function peaks(mag,binHz){
+  const out=new Float64Array(mag.length), reach=Math.max(4,Math.round(80/binHz));let top=0;
+  for(const v of mag)top=Math.max(top,v);
+  for(let k=2;k<mag.length-2;k++){
+    if(mag[k]<mag[k-1]||mag[k]<mag[k+1]||mag[k]<top*.01)continue;
+    let sum=0,count=0;for(let j=Math.max(0,k-reach);j<=Math.min(mag.length-1,k+reach);j++){sum+=mag[j];count++;}
+    const level=sum/count;if(mag[k]>level*1.5)out[k]=mag[k]/top;
+  }
+  return out;
+}
+function salience(peak,binHz){
+  const steps=(HIGH_NOTE-LOW_NOTE)*4+1, out=new Float64Array(steps);
+  for(let s=0;s<steps;s++){
+    const f0=hz(LOW_NOTE+s/4);let sum=0;
+    for(let h=1;h<=HARMONICS;h++){
+      const f=f0*h, from=Math.max(1,Math.floor(f*.9715/binHz)), to=Math.min(peak.length-1,Math.ceil(f*1.0293/binHz));
+      if(from>=peak.length)break;
+      // A harmonic counts most when it sits right on the pitch, less as it drifts up to half a semitone away.
+      let top=0;for(let k=from;k<=to;k++)if(peak[k])top=Math.max(top,peak[k]*Math.cos(Math.PI*6*Math.log2(k*binHz/f))**2);
+      sum+=top*Math.pow(.8,h-1);
+    }
+    out[s]=sum;
+  }
+  return out;
+}
+// The tune, 25 times a second: the loudest pitch wherever one rings out clearly (0 where none does).
+export const MELODY_STEP=.04;
+export function melodyTrack(channels,sampleRate,onProgress=()=>{}){
+  const read=spectrumReader(channels,sampleRate), binHz=sampleRate/PITCH_SIZE, duration=(channels[0]?.length||0)/sampleRate;
+  const notes=[];let previous=null,since=9;
+  for(let t=0;t*MELODY_STEP<duration;t++){
+    const score=salience(peaks(read(t*MELODY_STEP),binHz),binHz);
+    let best=0,mean=0;for(let s=0;s<score.length;s++){mean+=score[s];if(score[s]>score[best])best=s;}
+    mean/=score.length;since++;
+    if(!(score[best]>mean*3)){notes.push(0);continue;}
+    // An octave slip is the usual mistake: when the octave nearer the last note rings almost as loud, the melody stays there.
+    if(previous!==null&&since<8)for(const octave of [-48,48]){
+      const s=best+octave;
+      if(s>=0&&s<score.length&&score[s]>=score[best]*.8&&Math.abs(s-previous)<Math.abs(best-previous))best=s;
+    }
+    previous=best;since=0;notes.push(LOW_NOTE*4+best);
+    if(t%500===0)onProgress(t*MELODY_STEP/duration);
+  }
+  return notes;
+}
+// A note's pitch is the one held across most of the moment just after it starts; a drum hit or a slide has none.
+export function pitchAt(melody,time){
+  const from=Math.ceil((time+.04)/MELODY_STEP),to=Math.floor((time+.22)/MELODY_STEP),heard=[];
+  for(let i=from;i<=to&&i<melody.length;i++)if(melody[i])heard.push(melody[i]);
+  if(heard.length<3)return null;
+  heard.sort((a,b)=>a-b);const middle=heard[heard.length>>1];
+  return heard.filter(v=>Math.abs(v-middle)<=3).length>=3?middle/4:null;
+}
+const NOTE_NAMES=['C','C#','D','Eb','E','F','F#','G','Ab','A','Bb','B'];
+// Temperley's key profiles: how strongly each step of the scale belongs to a major or a minor key.
+const PROFILE={major:[5,2,3.5,2,4.5,4,2,4.5,2,3.5,1.5,4],minor:[5,2,3.5,4.5,2,4,2,4.5,3.5,2,1.5,4]};
+export function songKey(channels,sampleRate){
+  const read=spectrumReader(channels,sampleRate), binHz=sampleRate/PITCH_SIZE, duration=(channels[0]?.length||0)/sampleRate, chroma=new Float64Array(12);
+  for(let time=0;time<duration-.2;time+=.25){
+    const peak=peaks(read(time),binHz);
+    for(let k=Math.ceil(65/binHz);k<Math.min(peak.length,2100/binHz);k++)if(peak[k])chroma[((Math.round(12*Math.log2(k*binHz/440))+69)%12+12)%12]+=peak[k];
+  }
+  const correlate=(a,b)=>{const ma=a.reduce((s,v)=>s+v,0)/12,mb=b.reduce((s,v)=>s+v,0)/12;let ab=0,aa=0,bb=0;for(let i=0;i<12;i++){ab+=(a[i]-ma)*(b[i]-mb);aa+=(a[i]-ma)**2;bb+=(b[i]-mb)**2;}return aa&&bb?ab/Math.sqrt(aa*bb):0;};
+  let key={tonic:0,mode:'major',fit:-2};
+  for(const mode of ['major','minor'])for(let tonic=0;tonic<12;tonic++){
+    const fit=correlate(chroma,Array.from({length:12},(_,i)=>PROFILE[mode][(i-tonic+12)%12]));
+    if(fit>key.fit)key={tonic,mode,fit};
+  }
+  return {tonic:key.tonic,mode:key.mode,name:NOTE_NAMES[key.tonic],fit:Math.round(key.fit*100)/100};
 }
 export function trackBeats(analysis){
   if(analysis.beats?.length)return {bpm:analysis.tempo??analysis.bpm,beats:analysis.beats};
@@ -260,26 +357,41 @@ export function makeAudioChart(analysis,difficulty='easy'){
     note.hold=!note.chord&&room>=1.5*beat&&(note.event.sustain??0)>=.75*beat&&(note.level===0?note.bar===0||sinceHold>=2:sinceHold>=4)&&length>=Math.max(.3,.6*beat);
     note.length=note.hold?length:0;sinceHold=note.hold?0:sinceHold+1;
   });
-  // Lanes follow the melody's direction: a higher sound steps right, a lower
-  // one steps left, bouncing off the edges so every lane gets used. Quick runs
-  // climb one lane at a time like stairs, and no lane is hit twice in a row.
-  const free=[-9,-9,-9,-9], notes=[];let lane=1,last=[],before=-1,dir=1,band=1,previous=-9;
+  // Lanes follow the tune like keys on a piano: a higher note sits further
+  // right, a lower one further left, and a repeated note stays where it is.
+  // Each note is placed within the range the melody covers around it, then
+  // nudged so a step up always moves right and a step down always moves left.
+  // Notes with no clear pitch (drums) walk on in the tune's last direction.
+  const tune=picked.map(({event})=>event.pitch??(analysis.melody?pitchAt(analysis.melody,event.time):null));
+  const placed=i=>{
+    const around=[];for(let j=Math.max(0,i-8);j<=Math.min(tune.length-1,i+8);j++)if(tune[j]!==null)around.push(tune[j]);
+    around.sort((a,b)=>a-b);
+    let lo=around[Math.floor(around.length*.1)],hi=around[Math.floor((around.length-1)*.9)];
+    if(hi-lo<5){const mid=(lo+hi)/2;lo=mid-2.5;hi=mid+2.5;}
+    return Math.max(0,Math.min(3,Math.round((tune[i]-lo)/(hi-lo)*3)));
+  };
+  const free=[-9,-9,-9,-9], notes=[];let lane=1,last=[],dir=1,sung=null;
   picked.forEach(({event,chord,hold,length},i)=>{
-    const time=event.time, fast=time-previous<beat*.6, open=l=>l>=0&&l<4&&!last.includes(l)&&time-free[l]>=.18;
-    const pitch=event.strength?event.band??1:band;
-    if(pitch!==band)dir=pitch>band?1:-1;
-    const step=fast||i%3!==2?1:2;
-    let pick=lane+dir*step;
-    if(pick<0||pick>3)pick=lane+dir;
-    if(pick<0||pick>3){dir=-dir;pick=lane+dir*step;}
-    // Back-and-forth between the same two lanes moves on to a third.
-    if(pick===before&&[0,1,2,3].some(l=>open(l)&&l!==before))pick=[0,1,2,3].filter(l=>open(l)&&l!==before).sort((a,b)=>Math.abs(a-pick)-Math.abs(b-pick))[0];
-    if(!open(pick))pick=[0,1,2,3].filter(open).sort((a,b)=>Math.abs(a-pick)-Math.abs(b-pick))[0]??pick;
+    const time=event.time, open=l=>l>=0&&l<4&&time-free[l]>=.18, pitch=tune[i];
+    let pick;
+    if(pitch===null){
+      pick=lane+dir;if(pick<0||pick>3){dir=-dir;pick=lane+dir;}
+    }else{
+      pick=placed(i);
+      if(sung!==null){
+        const step=pitch-sung;
+        if(Math.abs(step)<.5)pick=lane;
+        else if(step>0)pick=Math.max(pick,Math.min(3,lane+(step>=5?2:1)));
+        else pick=Math.min(pick,Math.max(0,lane-(step<=-5?2:1)));
+      }
+    }
+    // A lane still busy (just played, or held) hands the note to the nearest open lane, on the side the tune is heading.
+    if(!open(pick)){const toward=pick===lane?dir:Math.sign(pick-lane);pick=[0,1,2,3].filter(open).sort((a,b)=>Math.abs(a-pick)-Math.abs(b-pick)||Math.sign(b-pick)*toward-Math.sign(a-pick)*toward)[0]??pick;}
     const add=l=>{notes.push({lane:l,time,type:hold?'hold':'tap',duration:hold?length:0,status:'pending'});free[l]=time+(hold?length:0);};
     add(pick);
     if(chord){const second=[0,1,2,3].filter(l=>l!==pick&&!last.includes(l)&&time-free[l]>=.18).sort((a,b)=>Math.abs(b-pick)-Math.abs(a-pick))[0];last=[pick];if(second!==undefined){add(second);last.push(second);}}else last=[pick];
     if(pick!==lane)dir=pick>lane?1:-1;
-    before=lane;lane=pick;band=pitch;previous=time;
+    lane=pick;sung=pitch;
   });
   return notes.sort((a,b)=>a.time-b.time||a.lane-b.lane).map((note,id)=>({id,...note}));
 }

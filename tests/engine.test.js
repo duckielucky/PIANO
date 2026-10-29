@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { TRACKS, makeChart, songSection, gradeTiming, Run } from '../dist/engine.js';
+import { readFileSync } from 'node:fs';
+import { TRACKS, MELODY, melodyNote, makeChart, songSection, gradeTiming, Run } from '../dist/engine.js';
 test('timing windows are symmetric and reject off-beat taps',()=>{
   assert.equal(gradeTiming(.07),'perfect');assert.equal(gradeTiming(-.13),'great');assert.equal(gradeTiming(.22),'good');assert.equal(gradeTiming(.28),null);assert.equal(gradeTiming(-.28),null);
 });
@@ -54,6 +55,26 @@ test('built-in charts follow the song: held breakdown, a two-lane drop, busier f
       assert.equal(chords.length>0,difficulty!=='easy',track.id+'/'+difficulty+' drop chord');
       const perBar=section=>{const notes=in_(section);return notes.length/new Set(notes.map(barOf)).size;};
       if(difficulty!=='easy')assert.ok(perBar('fill')>perBar('groove')&&perBar('breakdown')<perBar('groove'));
+    }
+  }
+});
+test('built-in lanes play the lead like piano keys: up moves right, down moves left',()=>{
+  // The chart reads the same tune the soundtrack plays.
+  assert.ok(readFileSync(new URL('../dist/audio.js',import.meta.url),'utf8').includes('const melody=['+MELODY.join(',')+']'));
+  for(const track of TRACKS){
+    const beat=60/track.bpm;
+    for(const difficulty of ['easy','normal','hard']){
+      const chart=makeChart(track,difficulty),single=chart.filter(n=>chart.filter(m=>m.time===n.time).length===1);
+      const note=n=>{const eighth=Math.round(n.time/beat*2);return melodyNote(Math.floor(eighth/8),eighth%8);};
+      let agree=0,pairs=0;
+      for(let i=1;i<single.length;i++){
+        const a=single[i-1],b=single[i],step=note(b)-note(a),move=Math.sign(b.lane-a.lane);
+        if(b.time-a.time>2*beat||a.type==='hold')continue;
+        const edge=step>0?a.lane===3:step<0&&a.lane===0;
+        pairs++;if(move===Math.sign(step)||edge&&move===0)agree++;
+      }
+      assert.ok(agree>=pairs*.9,`${track.id}/${difficulty}: ${agree} of ${pairs} lane moves follow the tune`);
+      assert.equal(new Set(chart.map(n=>n.lane)).size,4);
     }
   }
 });

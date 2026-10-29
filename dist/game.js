@@ -1,9 +1,9 @@
-import { TRACKS, WINDOWS, makeChart, trackMap, gradeTiming, gradeAccuracy, Run } from './engine.js?v=63c8d4c72d';
+import { TRACKS, WINDOWS, makeChart, trackMap, gradeTiming, gradeAccuracy, Run } from './engine.js?v=465cf6b1ee';
 import { Soundtrack } from './audio.js?v=71ed956385';
-import { makeAudioChart, beatMap, ANALYSIS_VERSION } from './beat-analysis.js?v=e291e73cbd';
-import { importSong } from './song-import.js?v=1bc4382a59';
+import { makeAudioChart, beatMap, ANALYSIS_VERSION } from './beat-analysis.js?v=4384fd3703';
+import { importSong } from './song-import.js?v=2a0b2fd6dd';
 import { listSongs, saveSong, deleteSong, MAX_SONGS } from './song-library.js?v=8ebd178751';
-import { chooseLanguage, translate } from './i18n.js?v=548c55d4bf';
+import { chooseLanguage, translate } from './i18n.js?v=92bf4244c2';
 
 const $ = s => document.querySelector(s);
 const canvas=$('#canvas'), ctx=canvas.getContext('2d'), stage=$('#stage'), modal=$('#modal');
@@ -36,6 +36,9 @@ function removeMySong(id){
   myTracks=myTracks.filter(item=>item.id!==id);deleteSong(id).catch(()=>{});
   if(track.id===id)setTrack(TRACKS[1]);
 }
+// The song's key: found in an uploaded song's sound; the original tracks are written in a minor key on their root note.
+const keyText=item=>{const key=item.uploaded?item.analysis?.key:{name:['C','C#','D','Eb','E','F','F#','G','Ab','A','Bb','B'][item.root%12],mode:'minor'};return key?t(key.mode==='major'?'keyMajor':'keyMinor',{note:key.name.replace('#','♯').replace(/(?<=.)b/,'♭')}):'';};
+const songFacts=(item,seconds)=>[item.uploaded?t('estimatedBpm',{bpm:item.bpm}):item.bpm+' BPM',keyText(item),clockText(seconds)].filter(Boolean).join(' · ');
 const clockText=seconds=>{const total=Math.round(seconds);return `${Math.floor(total/60).toString().padStart(2,'0')}:${(total%60).toString().padStart(2,'0')}`;};
 function chooseFile(){
   if(mode!=='menu')return;
@@ -79,7 +82,7 @@ function importContent(){
   return `<div class="analysis-orbit" aria-hidden="true">♫</div><h2>${t(status)}</h2>${name}<progress class="analysis-progress" ${progress===null?'':`value="${progress}"`} max="100" aria-label="${t(status)}"></progress><p class="import-hint" role="status">${progress===null?t('decoding'):t('analyzing')+' '+progress+'%'}</p><button class="secondary-button" data-action="back-songs">${t('cancel')}</button>`;
 }
 function songCard(item){
-  const card=`<button class="track-choice song-card ${item===track?'selected':''}" data-track="${item.id}" aria-pressed="${item===track}"><span class="song-symbol" aria-hidden="true">♫</span><span class="song-copy"><strong>${escapeHtml(trackTitle(item))}</strong><small>${item.bpm} BPM · ${clockText(item.duration??item.bars*4*60/item.bpm)}${item.uploaded&&!item.saved?' · '+t('notSaved'):''}</small></span><span class="song-chevron" aria-hidden="true">→</span></button>`;
+  const card=`<button class="track-choice song-card ${item===track?'selected':''}" data-track="${item.id}" aria-pressed="${item===track}"><span class="song-symbol" aria-hidden="true">♫</span><span class="song-copy"><strong>${escapeHtml(trackTitle(item))}</strong><small>${songFacts(item,item.duration??item.bars*4*60/item.bpm)}${item.uploaded&&!item.saved?' · '+t('notSaved'):''}</small></span><span class="song-chevron" aria-hidden="true">→</span></button>`;
   if(!item.uploaded)return card;
   const confirm=removing===item.id;
   return `<div class="song-item">${card}<button class="song-remove ${confirm?'confirm':''}" data-remove="${item.id}" aria-label="${escapeHtml(t('removeSong',{title:item.title}))}">${confirm?t('confirmRemove'):'✕'}</button></div>`;
@@ -92,7 +95,7 @@ function songMenuContent(){
 }
 function difficultyContent(){
   const notes=track.uploaded?makeAudioChart(track.analysis,difficulty):makeChart(track,difficulty);
-  return `<h2>${t('chooseDifficulty')}</h2><div class="selected-track"><span class="song-symbol" aria-hidden="true">♫</span><div><small>${t('selectedSong')}</small><strong>${escapeHtml(trackTitle(track))}</strong><span>${track.bpm} BPM · ${clockText(duration())}</span></div></div><div class="difficulty-cards" role="group" aria-label="${t('difficulty')}">`+['easy','normal','hard'].map((value,i)=>`<button class="difficulty-card ${value===difficulty?'selected':''}" data-difficulty="${value}" aria-pressed="${value===difficulty}"><span class="difficulty-bars" aria-hidden="true">${[0,1,2].map(n=>`<i class="${n<=i?'lit':''}"></i>`).join('')}</span><strong>${t(value)}</strong><small>${t(value+'Hint')}</small></button>`).join('')+`</div><div class="setup-summary" role="status"><span>${t('noteCount',{count:notes.length})}</span><span>${t(difficulty==='easy'?'noFail':'tapHold')}</span></div>${track.uploaded&&track.analysis.weakBeat?`<p class="setup-warning">${t('weakBeat')}</p>`:''}<button class="primary-button setup-start" data-action="start-game"><span aria-hidden="true">▶</span>${t('startGame')}</button>`;
+  return `<h2>${t('chooseDifficulty')}</h2><div class="selected-track"><span class="song-symbol" aria-hidden="true">♫</span><div><small>${t('selectedSong')}</small><strong>${escapeHtml(trackTitle(track))}</strong><span>${songFacts(track,duration())}</span></div></div><div class="difficulty-cards" role="group" aria-label="${t('difficulty')}">`+['easy','normal','hard'].map((value,i)=>`<button class="difficulty-card ${value===difficulty?'selected':''}" data-difficulty="${value}" aria-pressed="${value===difficulty}"><span class="difficulty-bars" aria-hidden="true">${[0,1,2].map(n=>`<i class="${n<=i?'lit':''}"></i>`).join('')}</span><strong>${t(value)}</strong><small>${t(value+'Hint')}</small></button>`).join('')+`</div><div class="setup-summary" role="status"><span>${t('noteCount',{count:notes.length})}</span><span>${t(difficulty==='easy'?'noFail':'tapHold')}</span></div><p class="setup-tune">${t('followsTune')}</p>${track.uploaded&&track.analysis.weakBeat?`<p class="setup-warning">${t('weakBeat')}</p>`:''}<button class="primary-button setup-start" data-action="start-game"><span aria-hidden="true">▶</span>${t('startGame')}</button>`;
 }
 $('#songFile').addEventListener('change',event=>loadSongs(event.target.files));
 modal.addEventListener('dragover',event=>{if(dialogType==='import'){event.preventDefault();modal.classList.add('file-dragover');}});
@@ -157,7 +160,7 @@ function saveBest(score){try{localStorage.setItem(bestKey(),String(score));}catc
 const format=n=>Math.round(n).toString().padStart(7,'0');
 function setTrack(next){
   track=next;$('#trackName').textContent=trackTitle(track);$('#trackName').title=trackTitle(track);$('#bpmLabel').textContent=track.uploaded?t('estimatedBpm',{bpm:track.bpm}):track.bpm+' BPM';
-  const sec=Math.round(duration());$('#trackDetail').textContent=`${track.uploaded?t('estimatedBpm',{bpm:track.bpm}):track.bpm+' BPM'} · ${clockText(sec)}`;
+  $('#trackDetail').textContent=songFacts(track,Math.round(duration()));
   $('#best').textContent=format(readBest());
 }
 function setDifficulty(value){difficulty=value;$('#energyLabel').textContent=t(value==='easy'?'noFail':'energy');$('#difficultyLabel').textContent=t(value);document.querySelectorAll('[data-difficulty]').forEach(b=>{const active=b.dataset.difficulty===value;b.classList.toggle('selected',active);b.setAttribute('aria-pressed',String(active));});$('#best').textContent=format(readBest());}
