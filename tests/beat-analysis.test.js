@@ -126,3 +126,24 @@ test('the chart rises and falls with the song: calm verse, busy chorus',()=>{
   const lanes=[0,1,2,3].map(l=>makeAudioChart(analysis,'hard').filter(n=>n.lane===l).length);
   assert.ok(Math.min(...lanes)>=Math.max(...lanes)*.4,'all four lanes used: '+lanes);
 });
+
+test('a syncopated groove keeps its real tempo and the beat lands on the snare and kick',()=>{
+  // 136 BPM trap-style bar: kick on 1, the "and" of 2 and 3, snare on 2 and 4,
+  // hi-hats on every eighth with a quick triplet roll. Easy to misread at 2/3 speed.
+  const bpm=136,beat=60/bpm,duration=40,samples=new Float32Array(rate*duration);
+  const hit=(time,freq,amp,decay)=>{for(let i=0;i<rate*.12;i++){const k=Math.round(time*rate)+i;if(k<samples.length)samples[k]+=amp*Math.sin(i/rate*2*Math.PI*freq)*Math.exp(-i/rate*decay);}};
+  const onBeat=[];
+  for(let bar=0,t=.5;t<duration-2;bar++,t=.5+bar*4*beat){
+    for(let b=0;b<4;b++)onBeat.push(t+b*beat);
+    for(const k of [0,1.5,2])hit(t+k*beat,60,.9,25);
+    for(const s of [1,3])hit(t+s*beat,1900,.6,40);
+    for(let e=0;e<8;e++)hit(t+e*beat/2,7000,.18,110);
+    if(bar%2)for(let r=0;r<3;r++)hit(t+3.5*beat+r*beat/6,7000,.15,110);
+  }
+  const analysis=analyzePcm([samples],rate);
+  assert.ok(Math.abs(analysis.bpm-bpm)<=2,'tempo '+analysis.bpm);
+  assert.equal(analysis.version,2);
+  const beats=analysis.beats.filter(b=>b>2&&b<duration-3);
+  const onGrid=beats.filter(b=>onBeat.some(t=>Math.abs(t-b)<.04)).length/beats.length;
+  assert.ok(onGrid>=.95,'beats on the groove: '+onGrid.toFixed(2));
+});

@@ -1,4 +1,6 @@
 // Audio-derived onsets, not a fixed/random chart. Runs in a worker in the browser.
+// Saved songs analysed by an older version are analysed again when picked.
+export const ANALYSIS_VERSION=2;
 export function analyzePcm(channels, sampleRate, onProgress = () => {}) {
   const length=channels[0]?.length||0, hop=Math.max(1,Math.round(sampleRate*.01));
   const frameCount=Math.ceil(length/hop), dt=hop/sampleRate;
@@ -19,7 +21,7 @@ export function analyzePcm(channels, sampleRate, onProgress = () => {}) {
     const count=Math.max(1,(end-begin)*channels.length);
     energy[frame]=Math.sqrt(energy[frame]/count);
     for(const band of bands)band[frame]=Math.sqrt(band[frame]/count);
-    if(frame%1000===0)onProgress(.65*frame/frameCount);
+    if(frame%1000===0)onProgress(.4*frame/frameCount);
   }
   let maxEnergy=0;for(const value of energy)maxEnergy=Math.max(maxEnergy,value);
   if(maxEnergy<.0001)throw new Error('silentSong');
@@ -45,7 +47,7 @@ export function analyzePcm(channels, sampleRate, onProgress = () => {}) {
     if(previous&&onset.time-previous.time<.12){if(onset.strength>previous.strength)onsets[onsets.length-1]=onset;}
     else onsets.push(onset);
   }
-  onProgress(.75);
+  onProgress(.45);
   // Inter-onset tempo votes. Actual note timestamps stay on detected attacks,
   // allowing tempo changes without drifting onto a synthetic BPM grid.
   const votes=new Float64Array(181);
@@ -68,55 +70,106 @@ export function analyzePcm(channels, sampleRate, onProgress = () => {}) {
     }
     bpm=120;
   }
+  // The beat grid, then lined up with the song's own attacks: the pulse peaks a
+  // little before the sound is heard, so the grid moves by the typical gap.
+  const pulse=pulseBeats(spectralFlux(channels,sampleRate,p=>onProgress(.45+.5*p))), near=nearFinder(events);
+  const gaps=pulse.beats.map(time=>near(time,.06)?.time-time).filter(Number.isFinite).sort((a,b)=>a-b);
+  const shift=Math.max(-.04,Math.min(.04,gaps[gaps.length>>1]??0));
+  const beats=pulse.beats.map(time=>Math.round((time+shift)*1000)/1000).filter(time=>time>=0&&time<duration);
   // The tempo shown for the song is the one its notes follow.
-  if(events!==onsets||!weakBeat)bpm=Math.round(trackBeats({events,duration}).bpm);
+  const tempo=pulse.bpm;bpm=Math.round(tempo);
   const waveform=Array.from({length:96},(_,i)=>{
     let value=0;for(let j=Math.floor(i*frameCount/96);j<Math.floor((i+1)*frameCount/96);j++)value=Math.max(value,energy[j]);
     return value/maxEnergy;
   });
   onProgress(1);
-  return {bpm,confidence,weakBeat,events,waveform,duration};
+  return {version:ANALYSIS_VERSION,bpm,tempo,beats,confidence,weakBeat,events,waveform,duration};
 }
 
-// The beat itself: a steady pulse fitted through the detected attacks. The
-// tempo comes from how the attacks repeat (autocorrelation, leaning toward
-// everyday tempos so a song is not read at half or double speed), and the
-// beats are then threaded through the attacks by dynamic programming, so the
-// grid keeps to the tempo but bends with a live drummer.
-const FRAME=.01;
-export function trackBeats(analysis){
-  const events=analysis.events||[], duration=analysis.duration||((events.at(-1)?.time||0)+1);
-  const n=Math.max(2,Math.ceil(duration/FRAME)+2), env=new Float32Array(n);
-  const spread=[.25,.6,1,.6,.25];
-  for(const event of events){
-    const at=Math.round(event.time/FRAME);
-    spread.forEach((w,i)=>{const k=at+i-2;if(k>=0&&k<n)env[k]+=w*Math.max(.05,event.strength??1);});
+// The beat itself. The song's sound is split into 48 bands from 40 Hz to
+// 5 kHz, 100 times a second, and every rise in any band counts towards the
+// pulse (spectral flux), so drums, bass, chords and voice all mark the beat.
+// The tempo is how that pulse repeats, leaning toward everyday tempos around
+// 120 BPM so a song is not read at half or double speed. The beats are then
+// threaded through the strongest moments by dynamic programming, which keeps
+// the tempo steady but lets it bend with a live drummer.
+const FRAME=.01, FFT_SIZE=1024, BANDS=48;
+function fft(re,im){
+  const n=re.length;
+  for(let i=1,j=0;i<n;i++){let bit=n>>1;for(;j&bit;bit>>=1)j^=bit;j^=bit;if(i<j){[re[i],re[j]]=[re[j],re[i]];[im[i],im[j]]=[im[j],im[i]];}}
+  for(let len=2;len<=n;len<<=1){
+    const angle=-2*Math.PI/len,wr=Math.cos(angle),wi=Math.sin(angle);
+    for(let i=0;i<n;i+=len){let cr=1,ci=0;for(let k=0;k<len/2;k++){const a=i+k,b=a+len/2,tr=re[b]*cr-im[b]*ci,ti=re[b]*ci+im[b]*cr;re[b]=re[a]-tr;im[b]=im[a]-ti;re[a]+=tr;im[a]+=ti;const next=cr*wr-ci*wi;ci=cr*wi+ci*wr;cr=next;}}
   }
-  // Tempo: the lag at which the pulse best repeats, 70–180 BPM.
-  const minLag=Math.round(60/180/FRAME),maxLag=Math.round(60/70/FRAME);
-  let bestLag=Math.round(60/120/FRAME),bestScore=-1;const score=new Float64Array(maxLag+2);
-  for(let lag=minLag;lag<=maxLag+1;lag++){
-    let sum=0;for(let i=0;i+lag<n;i++)sum+=env[i]*env[i+lag];
-    const bpm=60/(lag*FRAME),prior=Math.exp(-.5*(Math.log2(bpm/115)/.9)**2);
-    score[lag]=sum*prior;
+}
+export function spectralFlux(channels,sampleRate,onProgress=()=>{}){
+  const length=channels[0]?.length||0, hop=sampleRate*FRAME, frames=Math.max(1,Math.floor(length/hop));
+  const window=Float32Array.from({length:FFT_SIZE},(_,i)=>.5-.5*Math.cos(2*Math.PI*i/FFT_SIZE));
+  const top=Math.min(5000,sampleRate*.475), edges=Array.from({length:BANDS+1},(_,i)=>Math.round(40*Math.pow(top/40,i/BANDS)/sampleRate*FFT_SIZE));
+  const power=new Float64Array(frames*BANDS), re=new Float64Array(FFT_SIZE), im=new Float64Array(FFT_SIZE);let loudest=1e-12;
+  for(let t=0;t<frames;t++){
+    // Each channel is measured on its own, so opposite-phase stereo never cancels.
+    const begin=Math.round(t*hop)-FFT_SIZE/2;
+    for(const pcm of channels){
+      for(let i=0;i<FFT_SIZE;i++){const k=begin+i;re[i]=k>=0&&k<length?pcm[k]*window[i]:0;im[i]=0;}
+      fft(re,im);
+      for(let b=0;b<BANDS;b++){const from=edges[b],to=Math.max(from+1,edges[b+1]);let sum=0;for(let k=from;k<to;k++)sum+=re[k]*re[k]+im[k]*im[k];power[t*BANDS+b]+=sum;}
+    }
+    for(let b=0;b<BANDS;b++)loudest=Math.max(loudest,power[t*BANDS+b]);
+    if(t%2000===0)onProgress(.8*t/frames);
   }
-  for(let lag=minLag;lag<=maxLag;lag++)if(score[lag]>bestScore){bestScore=score[lag];bestLag=lag;}
+  const floor=loudest*1e-8;
+  for(let i=0;i<power.length;i++)power[i]=10*Math.log10(Math.max(floor,power[i]));
+  // A rise counts against the loudest neighbouring band two frames earlier, so vibrato and slides don't read as hits.
+  const env=new Float32Array(frames);
+  for(let t=2;t<frames;t++){
+    let sum=0;
+    for(let b=0;b<BANDS;b++){const p=(t-2)*BANDS;sum+=Math.max(0,power[t*BANDS+b]-Math.max(power[p+Math.max(0,b-1)],power[p+b],power[p+Math.min(BANDS-1,b+1)]));}
+    env[t]=sum/BANDS;
+  }
+  onProgress(1);
+  return env;
+}
+export function pulseBeats(pulse){
+  const n=pulse.length;let mean=0;for(const v of pulse)mean+=v;mean/=Math.max(1,n);
+  let spread=0;for(const v of pulse)spread+=(v-mean)**2;spread=Math.sqrt(spread/Math.max(1,n))||1;
+  const env=Float32Array.from(pulse,v=>v/spread);
+  // Tempo: the strongest repeat between 50 and 220 BPM, weighted toward 120.
+  const minLag=Math.round(60/220/FRAME),maxLag=Math.round(60/50/FRAME),repeat=new Float64Array(maxLag+2);
+  for(let lag=minLag;lag<=maxLag+1;lag++){let sum=0;for(let i=0;i+lag<n;i++)sum+=env[i]*env[i+lag];repeat[lag]=sum/Math.max(1,n-lag);}
+  let bestLag=Math.round(60/120/FRAME),bestScore=-Infinity;
+  for(let lag=minLag+1;lag<maxLag;lag++){
+    if(repeat[lag]<repeat[lag-1]||repeat[lag]<repeat[lag+1])continue;
+    const bpm=60/(lag*FRAME),score=repeat[lag]*Math.exp(-.5*Math.log2(bpm/120)**2);
+    if(score>bestScore){bestScore=score;bestLag=lag;}
+  }
   let period=bestLag;
-  if(bestLag>minLag&&bestLag<maxLag){const a=score[bestLag-1],b=score[bestLag],c=score[bestLag+1],d=a-2*b+c;if(d<0)period=bestLag+.5*(a-c)/d;}
-  // Beats: each frame's best score is its own pulse plus the best earlier beat
-  // one period back, penalised for stretching or squeezing the period.
-  const tight=100, best=new Float64Array(n), back=new Int32Array(n).fill(-1);
-  let mean=0,count=0;for(const v of env)if(v>0){mean+=v;count++;}mean=count?mean/count:1;
+  {const a=repeat[bestLag-1],b=repeat[bestLag],c=repeat[bestLag+1],d=a-2*b+c;if(d<0)period=bestLag+.5*(a-c)/d;}
+  // Beats: each frame scores its own (lightly smoothed) pulse plus the best
+  // beat one period earlier, penalised for stretching or squeezing the period.
+  const sigma=period/32,width=Math.ceil(3*sigma),local=new Float64Array(n);
+  for(let i=0;i<n;i++){let sum=0;for(let j=-width;j<=width;j++){const q=i+j;if(q>=0&&q<n)sum+=env[q]*Math.exp(-.5*(j/sigma)**2);}local[i]=sum;}
+  const tight=1000,best=new Float64Array(n),back=new Int32Array(n).fill(-1);
   for(let i=0;i<n;i++){
-    const local=env[i]/mean;let top=0,from=-1;
-    const lo=Math.max(0,Math.round(i-2*period)),hi=Math.round(i-period/2);
-    for(let j=lo;j<=hi;j++){const v=best[j]-tight*Math.log((i-j)/period)**2;if(v>top){top=v;from=j;}}
-    best[i]=local+top;back[i]=from;
+    let top=0,from=-1;
+    for(let j=Math.max(0,Math.round(i-2*period));j<=Math.round(i-period/2);j++){const v=best[j]-tight*Math.log((i-j)/period)**2;if(v>top){top=v;from=j;}}
+    best[i]=local[i]+top;back[i]=from;
   }
   let end=n-1;for(let i=Math.max(0,Math.round(n-period));i<n;i++)if(best[i]>best[end])end=i;
   const frames=[];for(let i=end;i>=0;i=back[i])frames.push(i);
   frames.reverse();
   return {bpm:60/(period*FRAME),beats:frames.map(f=>f*FRAME)};
+}
+export function trackBeats(analysis){
+  if(analysis.beats?.length)return {bpm:analysis.tempo??analysis.bpm,beats:analysis.beats};
+  // Songs analysed before the spectral pulse existed: rebuild a pulse from their detected attacks.
+  const events=analysis.events||[], duration=analysis.duration||((events.at(-1)?.time||0)+1);
+  const n=Math.max(2,Math.ceil(duration/FRAME)+2), env=new Float32Array(n);
+  for(const event of events){
+    const at=Math.round(event.time/FRAME);
+    [.25,.6,1,.6,.25].forEach((w,i)=>{const k=at+i-2;if(k>=0&&k<n)env[k]+=w*Math.max(.05,event.strength??1);});
+  }
+  return pulseBeats(env);
 }
 
 // Events are in time order, so a binary search finds the first one at or after a time.

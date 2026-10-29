@@ -1,7 +1,7 @@
 import { TRACKS, WINDOWS, makeChart, trackMap, gradeTiming, gradeAccuracy, Run } from './engine.js?v=63c8d4c72d';
 import { Soundtrack } from './audio.js?v=71ed956385';
-import { makeAudioChart, beatMap } from './beat-analysis.js?v=935406f2a6';
-import { importSong } from './song-import.js?v=065e601946';
+import { makeAudioChart, beatMap, ANALYSIS_VERSION } from './beat-analysis.js?v=e291e73cbd';
+import { importSong } from './song-import.js?v=1bc4382a59';
 import { listSongs, saveSong, deleteSong, MAX_SONGS } from './song-library.js?v=8ebd178751';
 import { chooseLanguage, translate } from './i18n.js?v=548c55d4bf';
 
@@ -370,7 +370,12 @@ $('#modalContent').addEventListener('click',e=>{
   if(removing){removing='';if(dialogType==='tracks')renderDialog();}
   if(action==='choose-file')importNote=null;
   const id=e.target.closest('[data-track]')?.dataset.track;
-  if(id){const item=availableTracks().find(entry=>entry.id===id);importNote=null;setTrack(item);prepare(item).catch(()=>{});showDialog('difficulty');}
+  if(id){
+    const item=availableTracks().find(entry=>entry.id===id);importNote=null;
+    // A song saved before the current beat finder is analysed again, once, from its saved file.
+    if(item.uploaded&&item.analysis?.version!==ANALYSIS_VERSION&&item.file){loadSongs([new File([item.file],item.file.name||item.title,{type:item.file.type})]);return;}
+    setTrack(item);prepare(item).catch(()=>{});showDialog('difficulty');
+  }
   const choice=e.target.closest('[data-difficulty]')?.dataset.difficulty;
   if(choice){setDifficulty(choice);renderDialog();$(`[data-difficulty="${choice}"]`).focus();}
 });
