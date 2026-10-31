@@ -85,7 +85,7 @@ test('Expert judges tighter and misses cost more energy',()=>{
   for(let i=0;i<10;i++){hard.judge(hard.notes[i],'miss');normal.judge(normal.notes[i],'miss');}
   assert.ok(hard.energy<normal.energy);assert.equal(hard.candidate(0,10.19),undefined);assert.ok(normal.candidate(0,10.19));
 });
-test('sound delay is caught up from taps, and stray taps move nothing',()=>{
+test('tap delay is caught up from taps, and stray taps move nothing',()=>{
   assert.equal(syncStep([.2,.2,.2]),0);
   assert.equal(syncStep(Array(8).fill(.01)),0);
   assert.equal(syncStep(Array(8).fill(.3)),.03);assert.equal(syncStep(Array(8).fill(-.3)),-.03);
@@ -100,7 +100,7 @@ test('sound delay is caught up from taps, and stray taps move nothing',()=>{
   }
   assert.ok(Math.abs(offset-delay)<=.02,'caught up to '+offset);assert.ok(taps<=60,'took '+taps+' taps');
 });
-test('the game learns the sound delay from taps and offers it to adjust',()=>{
+test('learned tap delay moves scoring only; the sound delay set by hand moves the notes',()=>{
   const game=readFileSync(new URL('../dist/game.js',import.meta.url),'utf8'),audio=readFileSync(new URL('../dist/audio.js',import.meta.url),'utf8');
-  assert.match(game,/learnSync\(lane,t\);const n=run\.candidate/);assert.match(game,/data-sync="-1"/);assert.match(audio,/-this\.offset-this\.startTime/);
+  assert.match(game,/const t=tapTime\(\);learnSync\(lane,t\);const n=run\.candidate/);assert.match(game,/setTapDelay\(before\+step\)/);assert.doesNotMatch(game,/setSync\(before/);assert.match(game,/data-sync="-1"/);assert.match(audio,/-this\.offset-this\.startTime/);
 });

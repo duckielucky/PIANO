@@ -1,9 +1,9 @@
-import { TRACKS, makeChart, trackMap, gradeTiming, gradeAccuracy, Run, syncStep, SYNC_RANGE } from './engine.js?v=275d90bbc1';
+import { TRACKS, makeChart, trackMap, gradeTiming, gradeAccuracy, Run, syncStep, SYNC_RANGE } from './engine.js?v=61f3a7b7e0';
 import { Soundtrack } from './audio.js?v=d68ed20822';
 import { makeAudioChart, beatMap, ANALYSIS_VERSION } from './beat-analysis.js?v=5c36b5d508';
 import { importSong } from './song-import.js?v=89509aad09';
 import { listSongs, saveSong, deleteSong, MAX_SONGS } from './song-library.js?v=8ebd178751';
-import { chooseLanguage, translate } from './i18n.js?v=22cff80108';
+import { chooseLanguage, translate } from './i18n.js?v=430926f88e';
 
 const $ = s => document.querySelector(s);
 const canvas=$('#canvas'), ctx=canvas.getContext('2d'), stage=$('#stage'), modal=$('#modal');
@@ -155,21 +155,32 @@ function beatAt(grid,t){
 }
 const duration=()=>track.duration??track.bars*4*60/track.bpm;
 const bestKey=()=>`neon-rush-tap-hold-best-${track.id}-${difficulty}`;
-// The player's sound delay, kept on this device.
+// Two delays, both kept on this device. The sound delay (set with − and +)
+// moves the notes and the beat to where the sound is heard, for Bluetooth and
+// phones that don't report their delay. The tap delay is learned from taps
+// and only moves scoring, so a finger that lands a little late still scores
+// while the notes and the beat flashes stay locked to the music.
 const clampSync=v=>Math.round(Math.max(SYNC_RANGE[0],Math.min(SYNC_RANGE[1],v))*1000)/1000;
-try{audio.offset=clampSync(Number(localStorage.getItem('vipermix-sound-delay'))||0);}catch{}
-function setSync(value){audio.offset=clampSync(value);try{localStorage.setItem('vipermix-sound-delay',String(audio.offset));}catch{}}
+let tapDelay=0;
+try{
+  localStorage.removeItem('vipermix-sound-delay');
+  audio.offset=clampSync(Number(localStorage.getItem('vipermix-audio-delay'))||0);
+  tapDelay=clampSync(Number(localStorage.getItem('vipermix-tap-delay'))||0);
+}catch{}
+function setSync(value){audio.offset=clampSync(value);try{localStorage.setItem('vipermix-audio-delay',String(audio.offset));}catch{}}
+function setTapDelay(value){tapDelay=clampSync(value);try{localStorage.setItem('vipermix-tap-delay',String(tapDelay));}catch{}}
+const tapTime=()=>audio.time-tapDelay;
 const syncText=()=>t('soundDelayValue',{ms:Math.round(audio.offset*1000)});
 const syncRow=()=>`<div class="sync-row"><div><strong>${t('soundDelay')}</strong><small>${t('soundDelayHint')}</small></div><div class="sync-controls"><button class="sync-button" data-sync="-1" aria-label="${t('soundDelayLess')}">−</button><output role="status">${syncText()}</output><button class="sync-button" data-sync="1" aria-label="${t('soundDelayMore')}">+</button></div></div>`;
 let syncSamples=[],sinceSync=0;
-// A tap near a note, scored or not, tells how late this player hears the song.
+// A tap near a note, scored or not, tells how late this player's taps land.
 function learnSync(lane,t){
   let near=null;for(const n of run.notes)if(n.lane===lane&&(n.status==='pending'||n.status==='miss')&&Math.abs(t-n.time)<.4&&(!near||Math.abs(t-n.time)<Math.abs(t-near.time)))near=n;
   if(!near)return;
   syncSamples.push(t-near.time);if(syncSamples.length>16)syncSamples.shift();
   if(++sinceSync<4)return;
   const step=syncStep(syncSamples);if(!step)return;
-  const before=audio.offset;setSync(before+step);const moved=audio.offset-before;
+  const before=tapDelay;setTapDelay(before+step);const moved=tapDelay-before;
   syncSamples=syncSamples.map(e=>e-moved);sinceSync=0;
 }
 function readBest(){try{return Number(localStorage.getItem(bestKey()))||0;}catch{return 0;}}
@@ -300,7 +311,7 @@ function showError(){showDialog('error');}
 function isLaneDown(lane){return keys.has(lane)||[...pointers.values()].some(p=>p.lane===lane);}
 function press(lane){
   if(mode!=='playing')return;
-  flashes[lane]=.7;const t=audio.time;learnSync(lane,t);const n=run.candidate(lane,t);if(!n)return;
+  flashes[lane]=.7;const t=tapTime();learnSync(lane,t);const n=run.candidate(lane,t);if(!n)return;
   const rating=gradeTiming(t-n.time,run.windows);
   if(n.type==='hold'){n.status='holding';n.holdGrade=rating;n.error=t-n.time;burst(lane,'#c898ff');}
   else judge(n,rating,t-n.time);
@@ -308,7 +319,7 @@ function press(lane){
 function release(lane){
   if(mode!=='playing'||isLaneDown(lane))return;
   const n=run.notes.find(n=>n.lane===lane&&n.status==='holding');
-  if(n)judge(n,audio.time>=n.time+n.duration-.22?n.holdGrade:'miss',n.error);
+  if(n)judge(n,tapTime()>=n.time+n.duration-.22?n.holdGrade:'miss',n.error);
 }
 $('#laneInputs').addEventListener('pointerdown',e=>{
   const button=e.target.closest('[data-lane]');if(!button||mode!=='playing')return;e.preventDefault();
@@ -397,7 +408,7 @@ $('#modalContent').addEventListener('click',e=>{
     setTrack(item);prepare(item).catch(()=>{});showDialog('difficulty');
   }
   const sync=e.target.closest('[data-sync]')?.dataset.sync;
-  if(sync){setSync(audio.offset+Number(sync)*.01);syncSamples=[];$('#modalContent .sync-row output').textContent=syncText();return;}
+  if(sync){setSync(audio.offset+Number(sync)*.01);$('#modalContent .sync-row output').textContent=syncText();return;}
   const choice=e.target.closest('[data-difficulty]')?.dataset.difficulty;
   if(choice){setDifficulty(choice);renderDialog();$(`[data-difficulty="${choice}"]`).focus();}
 });
@@ -426,7 +437,7 @@ function frame(now){
       if(t<0){const count=Math.min(3,Math.ceil(-t/(60/track.bpm)));$('#countdown').hidden=false;if(count!==lastCountdown){lastCountdown=count;$('#countdown').textContent=count;pop($('#countdown'));}}
       else if(mode==='countdown'){setMode('playing');$('#countdown').hidden=true;}
       for(const n of run.notes){
-        if(n.status==='pending'&&t>n.time+run.windows.miss)judge(n,'miss');
+        if(n.status==='pending'&&t-tapDelay>n.time+run.windows.miss)judge(n,'miss');
         if(n.status==='holding'){
           flashes[n.lane]=reducedMotion?.6:.65+Math.sin(visualTime*8)*.12;
           if(t>=n.time+n.duration-.035)judge(n,n.holdGrade,n.error);

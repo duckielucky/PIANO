@@ -7,10 +7,10 @@ export const WINDOWS = { perfect: .09, great: .16, good: .24, miss: .27 };
 // Hard judges tighter: a note has to land closer to the beat to count at all.
 export const HARD_WINDOWS = { perfect: .06, great: .11, good: .17, miss: .2 };
 export const windowsFor = difficulty => difficulty === 'hard' ? HARD_WINDOWS : WINDOWS;
-// Sound delay: how late taps land on average, caught up while you play. Every
+// Tap delay: how late taps land on average, caught up while you play. Every
 // tap near a note (within .4 s, even too far off to score) is a sample; once
 // eight are in, the delay moves 60% of the way to their median, at most 30 ms
-// at a time, so a Bluetooth delay is caught up within a few bars and a single
+// at a time, so a steady lag is caught up within a few bars and a single
 // stray tap moves nothing.
 export const SYNC_RANGE = [-.25, .5];
 export function syncStep(samples) {
