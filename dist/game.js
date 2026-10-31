@@ -1,9 +1,9 @@
-import { TRACKS, WINDOWS, makeChart, trackMap, gradeTiming, gradeAccuracy, Run } from './engine.js?v=465cf6b1ee';
+import { TRACKS, makeChart, trackMap, gradeTiming, gradeAccuracy, Run } from './engine.js?v=162ad3d619';
 import { Soundtrack } from './audio.js?v=71ed956385';
-import { makeAudioChart, beatMap, ANALYSIS_VERSION } from './beat-analysis.js?v=4384fd3703';
-import { importSong } from './song-import.js?v=2a0b2fd6dd';
+import { makeAudioChart, beatMap, ANALYSIS_VERSION } from './beat-analysis.js?v=8d08951fa7';
+import { importSong } from './song-import.js?v=6eae3c8235';
 import { listSongs, saveSong, deleteSong, MAX_SONGS } from './song-library.js?v=8ebd178751';
-import { chooseLanguage, translate } from './i18n.js?v=92bf4244c2';
+import { chooseLanguage, translate } from './i18n.js?v=3813ddef73';
 
 const $ = s => document.querySelector(s);
 const canvas=$('#canvas'), ctx=canvas.getContext('2d'), stage=$('#stage'), modal=$('#modal');
@@ -145,7 +145,7 @@ let lastScore=-1,lastCombo=-1,lastEnergy=-1, visualTime=0, lastCountdown=null;
 function setMode(next){mode=next;document.body.dataset.state=next;syncOrientation();}
 function pop(element){if(!reducedMotion)element.animate([{transform:'scale(1.13)'},{transform:'scale(1)'}],{duration:200,easing:'ease-out'});}
 const reducedMotion=matchMedia('(prefers-reduced-motion: reduce)').matches;
-const travel=()=>difficulty==='hard'?2.2:difficulty==='easy'?3.25:2.75;
+const travel=()=>difficulty==='hard'?1.7:difficulty==='easy'?3.25:2.75;
 // The song's beats and how hard each bar hits, worked out once per song.
 const beatGrid=item=>item.beatGrid??=(item.uploaded?beatMap(item.analysis):trackMap(item));
 function beatAt(grid,t){
@@ -284,7 +284,7 @@ function isLaneDown(lane){return keys.has(lane)||[...pointers.values()].some(p=>
 function press(lane){
   if(mode!=='playing')return;
   flashes[lane]=.7;const t=audio.time,n=run.candidate(lane,t);if(!n)return;
-  const rating=gradeTiming(t-n.time);
+  const rating=gradeTiming(t-n.time,run.windows);
   if(n.type==='hold'){n.status='holding';n.holdGrade=rating;n.error=t-n.time;burst(lane,'#c898ff');}
   else judge(n,rating,t-n.time);
 }
@@ -407,7 +407,7 @@ function frame(now){
       if(t<0){const count=Math.min(3,Math.ceil(-t/(60/track.bpm)));$('#countdown').hidden=false;if(count!==lastCountdown){lastCountdown=count;$('#countdown').textContent=count;pop($('#countdown'));}}
       else if(mode==='countdown'){setMode('playing');$('#countdown').hidden=true;}
       for(const n of run.notes){
-        if(n.status==='pending'&&t>n.time+WINDOWS.miss)judge(n,'miss');
+        if(n.status==='pending'&&t>n.time+run.windows.miss)judge(n,'miss');
         if(n.status==='holding'){
           flashes[n.lane]=reducedMotion?.6:.65+Math.sin(visualTime*8)*.12;
           if(t>=n.time+n.duration-.035)judge(n,n.holdGrade,n.error);

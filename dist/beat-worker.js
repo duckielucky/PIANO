@@ -1,4 +1,4 @@
-import { analyzePcm } from './beat-analysis.js?v=4384fd3703';
+import { analyzePcm } from './beat-analysis.js?v=8d08951fa7';
 self.onmessage=({data})=>{
   try{
     const result=analyzePcm(data.channels,data.sampleRate,value=>self.postMessage({progress:value}));

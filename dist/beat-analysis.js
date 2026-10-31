@@ -306,12 +306,12 @@ export function beatMap(analysis){
 }
 
 // How each difficulty fills a beat at each level: [play every n-th beat, notes per beat].
-const PLAN={easy:[[4,1],[2,1],[1,1]],normal:[[2,1],[1,1],[1,2]],hard:[[1,1],[1,2],[1,4]]};
-const GAP={easy:.45,normal:.2,hard:.11};
+const PLAN={easy:[[4,1],[2,1],[1,1]],normal:[[2,1],[1,1],[1,2]],hard:[[1,2],[1,4],[1,4]]};
+const GAP={easy:.45,normal:.2,hard:.09};
 
 export function makeAudioChart(analysis,difficulty='easy'){
   const map=beatMap(analysis), {beat,beats,levels,downbeat}=map, events=analysis.events||[], near=nearFinder(events);
-  const plan=PLAN[difficulty]||PLAN.easy, gap=GAP[difficulty]||GAP.easy, easy=difficulty==='easy';
+  const plan=PLAN[difficulty]||PLAN.easy, gap=GAP[difficulty]||GAP.easy, easy=difficulty==='easy', hard=difficulty==='hard';
   const strengths=events.map(e=>e.strength).sort((a,b)=>a-b), strong=p=>strengths[Math.floor(p*(strengths.length-1))]??0;
   const accent=strong(.5), sharp=strong(.6), end=analysis.duration-.25;
   const window=Math.max(.04,Math.min(.07,beat*.12)), heard=beats.map(time=>!!near(time,window));
@@ -330,19 +330,20 @@ export function makeAudioChart(analysis,difficulty='easy'){
       // A soft beat inside a steady groove still gets its note, right on the beat.
       if(!event&&onBeat&&level>0&&steady(k))event={time:slot,strength:0,band:1,sustain:0};
       if(!event||event.time<.04||event.time>end)continue;
-      if(steps===4&&step%2&&event.strength<sharp)continue;
+      if(steps===4&&step%2&&event.strength<(hard&&level===2?accent:sharp))continue;
       const last=picked.at(-1);
       if(last&&(event===last.event||event.time-last.event.time<gap))continue;
       picked.push({event,k,bar,level,onBeat});
     }
   });
   // Big hits get a second lane: the first downbeat of a peak, then downbeats
-  // (and on Expert, strong bass on beat 3) while the peak lasts.
+  // while the peak lasts. Hard also doubles strong bass on beat 3 of a peak,
+  // and loud downbeats in the groove.
   picked.forEach(note=>{
     const {event,k,bar,level,onBeat}=note;
-    if(easy||level<2||!onBeat||event.strength<accent)return;
+    if(easy||level<(hard?1:2)||!onBeat||event.strength<accent)return;
     const drop=levels[Math.max(0,k-4)]<2, barIndex=Math.floor((k-downbeat)/4);
-    note.chord=bar===0&&(drop||difficulty==='hard'||barIndex%2===0)||difficulty==='hard'&&bar===2&&event.band===0;
+    note.chord=level<2?bar===0&&event.strength>=sharp:bar===0&&(drop||hard||barIndex%2===0)||hard&&bar===2&&event.band===0;
   });
   // In a calm bar, a sustained first beat becomes a long note that takes over the beat after it.
   if(!easy)for(let i=0;i<picked.length-1;i++){

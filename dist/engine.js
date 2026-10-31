@@ -4,10 +4,13 @@ export const TRACKS = [
   { id: 'velocity', title: 'Terminal Velocity', bpm: 150, root: 42, bars: 40, mood: 'Fast lanes and late-night energy.', color: '#65edfa' },
 ];
 export const WINDOWS = { perfect: .09, great: .16, good: .24, miss: .27 };
+// Hard judges tighter: a note has to land closer to the beat to count at all.
+export const HARD_WINDOWS = { perfect: .06, great: .11, good: .17, miss: .2 };
+export const windowsFor = difficulty => difficulty === 'hard' ? HARD_WINDOWS : WINDOWS;
 export const POINTS = { perfect: 1000, great: 700, good: 400, miss: 0 };
-export function gradeTiming(delta) {
+export function gradeTiming(delta, windows = WINDOWS) {
   const d = Math.abs(delta);
-  return d <= WINDOWS.perfect ? 'perfect' : d <= WINDOWS.great ? 'great' : d <= WINDOWS.good ? 'good' : null;
+  return d <= windows.perfect ? 'perfect' : d <= windows.great ? 'great' : d <= windows.good ? 'good' : null;
 }
 export function gradeAccuracy(accuracy) {
   return accuracy >= 98 ? 'S' : accuracy >= 92 ? 'A' : accuracy >= 80 ? 'B' : accuracy >= 65 ? 'C' : 'D';
@@ -34,7 +37,7 @@ export function trackMap(track) {
 const STEPS = {
   easy: { groove: [0,4], fill: [0,4], breakdown: [0], drop: [0,4] },
   normal: { groove: [0,2,4,6], fill: [0,2,4,5,6,7], breakdown: [0,4], drop: [0,2,4,6] },
-  hard: { groove: [0,2,3,4,6,7], fill: [0,1,2,3,4,5,6,7], breakdown: [0,4,6], drop: [0,2,3,4,6,7] },
+  hard: { groove: [0,1,2,3,4,6,7], fill: [0,1,2,3,4,5,6,7], breakdown: [0,2,4,6], drop: [0,1,2,3,4,5,6,7] },
 };
 // The soundtrack's lead plays one of these steps (semitones above its root) on
 // every eighth note, moving one step along every four bars (see audio.js).
@@ -69,19 +72,21 @@ export function makeChart(track, difficulty = 'easy') {
 }
 export class Run {
   constructor(notes, difficulty = 'easy') {
-    this.difficulty = difficulty;
+    this.difficulty = difficulty; this.windows = windowsFor(difficulty);
     this.notes = notes; this.score = 0; this.combo = 0; this.maxCombo = 0;
     this.energy = 100; this.counts = { perfect: 0, great: 0, good: 0, miss: 0 }; this.errors = [];
   }
   candidate(lane, time) {
-    return this.notes.find(n => n.lane === lane && n.status === 'pending' && gradeTiming(n.time - time));
+    return this.notes.find(n => n.lane === lane && n.status === 'pending' && gradeTiming(n.time - time, this.windows));
   }
   judge(note, result, error = null) {
     if (note.status === 'hit' || note.status === 'miss') return false;
     note.status = result === 'miss' ? 'miss' : 'hit';
     this.counts[result]++;
-    if (result === 'miss') { this.combo = 0; this.energy = Math.max(0, this.energy - 2); }
-    else { this.combo++; this.score += POINTS[result]; this.maxCombo = Math.max(this.maxCombo, this.combo); this.energy = Math.min(100, this.energy + 1.6); }
+    // On Hard a miss costs more energy and a hit wins less back.
+    const hard = this.difficulty === 'hard';
+    if (result === 'miss') { this.combo = 0; this.energy = Math.max(0, this.energy - (hard ? 5 : 2)); }
+    else { this.combo++; this.score += POINTS[result]; this.maxCombo = Math.max(this.maxCombo, this.combo); this.energy = Math.min(100, this.energy + (hard ? 1.2 : 1.6)); }
     if (error !== null) this.errors.push(error);
     return true;
   }
