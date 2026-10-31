@@ -104,3 +104,11 @@ test('learned tap delay moves scoring only; the sound delay set by hand moves th
   const game=readFileSync(new URL('../dist/game.js',import.meta.url),'utf8'),audio=readFileSync(new URL('../dist/audio.js',import.meta.url),'utf8');
   assert.match(game,/const t=tapTime\(\);learnSync\(lane,t\);const n=run\.candidate/);assert.match(game,/setTapDelay\(before\+step\)/);assert.doesNotMatch(game,/setSync\(before/);assert.match(game,/data-sync="-1"/);assert.match(audio,/-this\.offset-this\.startTime/);
 });
+test('every cheer reads in English and Chinese, and the stage has a place for it',async()=>{
+  const {messages}=await import('../dist/i18n.js');
+  const game=readFileSync(new URL('../dist/game.js',import.meta.url),'utf8'),html=readFileSync(new URL('../dist/index.html',import.meta.url),'utf8');
+  const keys=[...new Set([...game.matchAll(/'(cheer[A-Z]\w+)'/g)].map(m=>m[1]))];
+  assert.ok(keys.length>=10,'cheers found: '+keys.join());
+  for(const lang of ['en','zh'])for(const key of [...keys,'comboCount','perfectStreak'])assert.ok(messages[lang][key],lang+' '+key);
+  assert.match(html,/id="cheer"/);
+});

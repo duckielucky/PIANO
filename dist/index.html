@@ -9,9 +9,9 @@
   <meta name="description" content="Upload a song and VIPERMIX turns its beats into a rhythm game. Tap blue notes and hold purple notes. Play in English or Chinese.">
   <title>VIPERMIX — Find your rhythm</title>
   <link rel="icon" href="vipermix-icon.png?v=83b93f0585" type="image/png">
-  <link rel="stylesheet" href="style.css?v=844481b4e9">
-  <link rel="stylesheet" href="landscape.css?v=412d5b5f65">
-  <link rel="stylesheet" href="theme.css?v=c74ae84e32">
+  <link rel="stylesheet" href="style.css?v=68a1ae474e">
+  <link rel="stylesheet" href="landscape.css?v=173963feb5">
+  <link rel="stylesheet" href="theme.css?v=a6ba2a0e21">
 </head>
 <body data-state="menu">
   <main class="phone" id="game" data-i18n-aria="game" aria-label="VIPERMIX rhythm game">
@@ -23,6 +23,7 @@
       <div class="stage-meta"><span><i></i> <span id="difficultyLabel">CHILL</span></span><span id="bpmLabel">110 BPM</span></div>
       <div class="combo" id="comboBox"><strong id="combo">0</strong><span data-i18n="combo">COMBO</span></div>
       <div id="judgment" class="judgment" aria-live="off"></div>
+      <div id="cheer" class="cheer" aria-live="polite"><strong></strong><span></span></div>
       <div class="lane-inputs" id="laneInputs"><button aria-label="Lane 1, D key" data-lane="0"><span>D</span></button><button aria-label="Lane 2, F key" data-lane="1"><span>F</span></button><button aria-label="Lane 3, J key" data-lane="2"><span>J</span></button><button aria-label="Lane 4, K key" data-lane="3"><span>K</span></button></div>
       <div class="countdown" id="countdown" hidden></div>
     </section>
@@ -52,6 +53,6 @@
     <h2><span data-i18n="turn">TURN</span><br><em data-i18n="sideways">SIDEWAYS.</em></h2>
     <button class="text-button" id="portraitButton" data-i18n="portrait">PLAY HERE ANYWAY</button>
   </section>
-  <script type="module" src="game.js?v=ec4170dd92"></script>
+  <script type="module" src="game.js?v=0c77277688"></script>
 </body>
 </html>

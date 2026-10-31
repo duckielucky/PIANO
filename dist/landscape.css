@@ -9,7 +9,7 @@ body{display:flex;align-items:center;justify-content:center;gap:0;min-height:100
 .energy{position:absolute;top:220px;left:22px;width:calc(var(--hud) - 44px);height:3px;margin:0;z-index:5}
 .stage{grid-column:2;grid-row:2/4;min-width:0;min-height:0;width:100%;height:100%;border-left:1px solid #ffffff08;overflow:hidden}
 body:not([data-state="menu"]) .stage{grid-column:2/4}
-.stage-meta{top:16px;left:22px;right:22px;font-size:8px}.combo{top:12%}.combo strong{font-size:43px}.judgment{top:56%}.lane-inputs{height:36%}.lane-inputs span{bottom:10%;opacity:.6;font-size:11px}
+.stage-meta{top:16px;left:22px;right:22px;font-size:8px}.combo{top:12%}.combo strong{font-size:43px}.judgment{top:56%}.cheer{top:30%}.lane-inputs{height:36%}.lane-inputs span{bottom:10%;opacity:.6;font-size:11px}
 .menu-overlay{grid-column:3;grid-row:2/4;position:relative;inset:auto;display:flex;flex-direction:column;justify-content:center;align-items:stretch;padding:20px 22px;border-left:1px solid #ffffff0a;background:linear-gradient(110deg,#151a2940,#120a24);z-index:4}
 .ready-chip{align-self:center;font-size:7px;letter-spacing:1.5px}.menu-title{margin:19px 0 25px;gap:4px}.menu-title span{font-size:23px}.menu-title em{font-size:70px}.menu-overlay .primary-button{min-height:48px}.difficulty-selector{margin-bottom:13px}.difficulty-selector button{font-size:8px;letter-spacing:.6px;padding:10px 0}.text-button{padding-top:15px;font-size:8px}
 .track-footer{grid-column:1;grid-row:3;align-self:end;display:grid;grid-template-columns:38px 1fr 16px;gap:9px;height:auto;min-height:74px;padding:13px 15px;border-top:1px solid #ffffff0a;background:#111522}
@@ -28,3 +28,5 @@ dialog{max-height:calc(100dvh - 24px);overflow:auto}
 @media(prefers-reduced-motion:reduce){.rotate-phone{animation:none}}
 :fullscreen .phone{width:100%;height:100dvh;max-height:none;aspect-ratio:auto;border:0;border-radius:0;box-shadow:none}
 :fullscreen body{padding:0}
+
+@media(orientation:landscape) and (max-height:540px){.cheer{top:27%}.cheer strong{font-size:34px}.cheer.big strong{font-size:42px}.cheer span{font-size:8px}}

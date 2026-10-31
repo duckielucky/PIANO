@@ -3,7 +3,7 @@ import { Soundtrack } from './audio.js?v=d68ed20822';
 import { makeAudioChart, beatMap, ANALYSIS_VERSION } from './beat-analysis.js?v=5c36b5d508';
 import { importSong } from './song-import.js?v=89509aad09';
 import { listSongs, saveSong, deleteSong, MAX_SONGS } from './song-library.js?v=8ebd178751';
-import { chooseLanguage, translate } from './i18n.js?v=430926f88e';
+import { chooseLanguage, translate } from './i18n.js?v=3701e9ba99';
 
 const $ = s => document.querySelector(s);
 const canvas=$('#canvas'), ctx=canvas.getContext('2d'), stage=$('#stage'), modal=$('#modal');
@@ -235,6 +235,8 @@ function highway(t){
   }
   // Every beat lands as a flash on the hit line and the highway edges: harder on
   // the first beat of a bar, and harder again when the song is at its peak.
+  // The first bar of the song's peak gets its own cheer.
+  if(now&&mode==='playing'&&now.k>=0){if(now.level===2&&lastLevel<2&&now.bar&&t>4)cheer('cheerDrop','',true);lastLevel=now.level;}
   const pulse=now&&!reducedMotion&&t>=0?Math.exp(-now.since*7)*(now.bar?1:.55)*[.55,.85,1.2][now.level]:0;
   for(let lane=0;lane<=4;lane++)line(project(0,lane/4),project(1.12,lane/4),lane===0||lane===4?`rgba(170,127,233,${.35+pulse*.5})`:'#8261ac30',lane===0||lane===4?1.4+pulse*1.2:1);
   ctx.shadowColor='#91baff';ctx.shadowBlur=10+pulse*20;line(project(1,0),project(1,1),`rgba(172,154,255,${.6+pulse*.4})`,1.5+pulse*1.5);ctx.shadowBlur=0;
@@ -292,7 +294,30 @@ function announce(result,lane){
   el.classList.remove('show');void el.offsetWidth;el.classList.add('show');
   if(result!=='miss')burst(lane,result==='perfect'?'#c898ff':'#79b8ff');
 }
-function judge(note,result,error){if(run.judge(note,result,error))announce(result,note.lane);updateHUD();}
+function judge(note,result,error){if(run.judge(note,result,error)){announce(result,note.lane);encourage(result);}updateHUD();}
+// Cheers: a word of encouragement in the middle of the stage at combo
+// milestones, long Perfect streaks, the song's drop, a comeback from low
+// energy, and after a rough patch. One at a time: a milestone cuts in over a
+// smaller cheer, and the drop and a comeback cut in over anything.
+const MILESTONES={10:'cheerNice',25:'cheerGreat',50:'cheerAwesome',100:'cheerAmazing',150:'cheerFire',200:'cheerUnstoppable'};
+let cheerUntil=0,cheerRank=0,perfectRun=0,missRun=0,lowEnergy=false,lastLevel=0;
+function cheer(key,detail='',big=false,rank=big?3:1){
+  const now=performance.now();if(now<cheerUntil&&rank<=cheerRank)return;cheerUntil=now+900;cheerRank=rank;
+  const el=$('#cheer');el.querySelector('strong').textContent=t(key);el.querySelector('span').textContent=detail;
+  el.classList.toggle('big',big);el.classList.remove('show');void el.offsetWidth;el.classList.add('show');
+  if(big)navigator.vibrate?.(25);
+  if(reducedMotion)return;
+  const colors=['#c898ff','#79b8ff','#ffffff','#ffae9d'];
+  for(let i=0;i<(big?56:28);i++){const a=Math.random()*Math.PI*2,v=90+Math.random()*(big?260:170);particles.push({x:width/2,y:height*.36,vx:Math.cos(a)*v,vy:Math.sin(a)*v*.7-60,life:.6+Math.random()*.5,color:colors[i%4],size:2+Math.random()*2.5});}
+}
+function encourage(result){
+  if(result==='miss'){perfectRun=0;if(++missRun===4)cheer('cheerKeepGoing');lowEnergy||=run.energy<25;return;}
+  missRun=0;perfectRun=result==='perfect'?perfectRun+1:0;
+  const combo=run.combo,milestone=MILESTONES[combo]??(combo>200&&combo%100===0?'cheerUnstoppable':null);
+  if(milestone)return cheer(milestone,t('comboCount',{count:combo}),combo>=50,combo>=50?3:2);
+  if(lowEnergy&&run.energy>=50){lowEnergy=false;return cheer('cheerComeback','',true);}
+  if(perfectRun%20===0&&perfectRun)cheer('cheerSmooth',t('perfectStreak',{count:perfectRun}));
+}
 function updateHUD(){
   if(!run)return;
   if(lastScore!==run.score){$('#score').textContent=format(run.score);if(run.score>lastScore&&lastScore>=0)pop($('#score'));lastScore=run.score;}
@@ -304,7 +329,7 @@ async function start(){
   const token=++session; closeModal();$('#playButton').disabled=true;
   try{await audio.unlock();await prepare(track);}catch(e){$('#playButton').disabled=false;showError();return;}
   if(token!==session)return;
-  run=new Run(track.uploaded?makeAudioChart(track.analysis,difficulty):makeChart(track,difficulty),difficulty);syncSamples=[];sinceSync=0;lastScore=lastCombo=lastEnergy=-1;keys.clear();pointers.clear();particles=[];ripples=[];lastCountdown=null;
+  run=new Run(track.uploaded?makeAudioChart(track.analysis,difficulty):makeChart(track,difficulty),difficulty);syncSamples=[];sinceSync=0;cheerUntil=cheerRank=0;perfectRun=missRun=lastLevel=0;lowEnergy=false;$('#cheer').classList.remove('show');lastScore=lastCombo=lastEnergy=-1;keys.clear();pointers.clear();particles=[];ripples=[];lastCountdown=null;
   audio.start(track,track.uploaded?travel()+.35:0);setMode('countdown');$('#menu').hidden=true;$('#pauseButton').disabled=false;$('#nextTrack').hidden=true;$('#trackButton').disabled=true;$('#playingBars').hidden=false;$('#countdown').hidden=false;$('#playButton').disabled=false;$('#songProgress').style.width='0%';updateHUD();
 }
 function showError(){showDialog('error');}
@@ -458,7 +483,7 @@ function frame(now){
     ctx.beginPath();ctx.ellipse(p.x,p.y,9+progress*p.span*.18,3+progress*16,0,0,Math.PI*2);ctx.stroke();
   }
   ctx.globalAlpha=1;
-  particles=particles.filter(p=>p.life>0);for(const p of particles){p.life-=dt;p.x+=p.vx*dt;p.y+=p.vy*dt;p.vy+=170*dt;ctx.globalAlpha=Math.min(1,p.life*3);ctx.fillStyle=p.color;ctx.fillRect(p.x,p.y,2,2);}ctx.globalAlpha=1;
+  particles=particles.filter(p=>p.life>0);for(const p of particles){p.life-=dt;p.x+=p.vx*dt;p.y+=p.vy*dt;p.vy+=170*dt;ctx.globalAlpha=Math.min(1,p.life*3);ctx.fillStyle=p.color;ctx.fillRect(p.x,p.y,p.size||2,p.size||2);}ctx.globalAlpha=1;
   requestAnimationFrame(frame);
 }
 applyLanguage();syncOrientation();resize();requestAnimationFrame(frame);
