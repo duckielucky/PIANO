@@ -175,6 +175,15 @@ dialog .setup-intro{font-size:11px;margin:0 0 18px;color:#bba6d3}
 .difficulty-bars i:nth-child(2){height:12px}.difficulty-bars i:nth-child(3){height:18px}.difficulty-bars i.lit{background:linear-gradient(#c898ff,#6d8df1)}
 .setup-summary{display:flex;align-items:center;justify-content:space-between;color:#bda8d6;font-size:10px;margin-top:13px}
 .setup-tune{color:#a996c1;font-size:10px;line-height:1.5;margin:7px 0 0}
+.sync-row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:10px;padding:8px 10px;border:1px solid rgba(190,160,255,.18);border-radius:10px;background:rgba(255,255,255,.03);text-align:left}
+.sync-row strong{display:block;color:#e9defa;font-size:11px;letter-spacing:.06em}
+.sync-row small{display:block;color:#a996c1;font-size:10px;line-height:1.4;margin-top:2px}
+.sync-controls{display:flex;align-items:center;gap:6px;flex:none}
+.sync-button{width:30px;height:30px;border-radius:8px;border:1px solid rgba(190,160,255,.35);background:rgba(170,140,255,.12);color:#f2eaff;font:inherit;font-size:16px;line-height:1;cursor:pointer;touch-action:manipulation}
+.sync-button:focus-visible{outline:2px solid #aa8cff;outline-offset:2px}
+.sync-controls output{min-width:58px;text-align:center;color:#f2eaff;font-size:12px;font-variant-numeric:tabular-nums}
+dialog[data-dialog="pause"] .sync-row{margin:0 0 12px}
+@media(orientation:landscape) and (max-height:540px){.setup-extras{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:5px}.setup-extras .setup-tune{margin:0}.setup-extras .sync-row{margin:0;padding:3px 4px 3px 10px;gap:10px;flex:none}.sync-row small{display:none}.sync-button{width:24px;height:24px;font-size:14px}.sync-controls output{min-width:48px;font-size:11px}}
 dialog .setup-warning{font-size:10px;line-height:1.4;margin:8px 0 0;color:#c6b0df}
 dialog .setup-start{gap:10px;width:100%;margin-top:15px}
 .song-card:focus-visible,.song-upload:focus-visible,.difficulty-card:focus-visible,.setup-back:focus-visible{outline:2px solid #e8d7ff;outline-offset:3px}

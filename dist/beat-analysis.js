@@ -97,27 +97,48 @@ export function analyzePcm(channels, sampleRate, onProgress = () => {}) {
 // threaded through the strongest moments by dynamic programming, which keeps
 // the tempo steady but lets it bend with a live drummer.
 const FRAME=.01, FFT_SIZE=1024, BANDS=48;
-function fft(re,im){
-  const n=re.length;
-  for(let i=1,j=0;i<n;i++){let bit=n>>1;for(;j&bit;bit>>=1)j^=bit;j^=bit;if(i<j){[re[i],re[j]]=[re[j],re[i]];[im[i],im[j]]=[im[j],im[i]];}}
-  for(let len=2;len<=n;len<<=1){
-    const angle=-2*Math.PI/len,wr=Math.cos(angle),wi=Math.sin(angle);
-    for(let i=0;i<n;i+=len){let cr=1,ci=0;for(let k=0;k<len/2;k++){const a=i+k,b=a+len/2,tr=re[b]*cr-im[b]*ci,ti=re[b]*ci+im[b]*cr;re[b]=re[a]-tr;im[b]=im[a]-ti;re[a]+=tr;im[a]+=ti;const next=cr*wr-ci*wi;ci=cr*wi+ci*wr;cr=next;}}
+// Bit-reversal order and twiddle factors are worked out once per FFT size.
+const fftTables=new Map();
+function tables(n){
+  let t=fftTables.get(n);
+  if(!t){
+    const rev=new Uint32Array(n),cos=new Float64Array(n/2),sin=new Float64Array(n/2);
+    for(let i=1,j=0;i<n;i++){let bit=n>>1;for(;j&bit;bit>>=1)j^=bit;j^=bit;rev[i]=j;}
+    for(let k=0;k<n/2;k++){cos[k]=Math.cos(-2*Math.PI*k/n);sin[k]=Math.sin(-2*Math.PI*k/n);}
+    fftTables.set(n,t={rev,cos,sin});
   }
+  return t;
+}
+function fft(re,im){
+  const n=re.length,{rev,cos,sin}=tables(n);
+  for(let i=1;i<n;i++){const j=rev[i];if(i<j){let v=re[i];re[i]=re[j];re[j]=v;v=im[i];im[i]=im[j];im[j]=v;}}
+  for(let len=2;len<=n;len<<=1){
+    const half=len>>1,step=n/len;
+    for(let i=0;i<n;i+=len)for(let k=0;k<half;k++){const a=i+k,b=a+half,wr=cos[k*step],wi=sin[k*step],tr=re[b]*wr-im[b]*wi,ti=re[b]*wi+im[b]*wr;re[b]=re[a]-tr;im[b]=im[a]-ti;re[a]+=tr;im[a]+=ti;}
+  }
+}
+// Two channels share one FFT: left as the real part, right as the imaginary
+// part. The sum of their powers at bin k is then (|Z[k]|^2+|Z[n-k]|^2)/2, so
+// stereo costs no more than mono and the channels are still measured apart.
+function channelPower(channels,begin,length,window,re,im,out){
+  const n=re.length,size=window.length;out.fill(0);
+  for(let c=0;c<channels.length;c+=2){
+    const left=channels[c],right=channels[c+1];re.fill(0);im.fill(0);
+    for(let i=0;i<size;i++){const k=begin+i;if(k>=0&&k<length){re[i]=left[k]*window[i];if(right)im[i]=right[k]*window[i];}}
+    fft(re,im);
+    for(let k=0;k<out.length;k++){const m=(n-k)&(n-1);out[k]+=(re[k]*re[k]+im[k]*im[k]+re[m]*re[m]+im[m]*im[m])/2;}
+  }
+  return out;
 }
 export function spectralFlux(channels,sampleRate,onProgress=()=>{}){
   const length=channels[0]?.length||0, hop=sampleRate*FRAME, frames=Math.max(1,Math.floor(length/hop));
   const window=Float32Array.from({length:FFT_SIZE},(_,i)=>.5-.5*Math.cos(2*Math.PI*i/FFT_SIZE));
   const top=Math.min(5000,sampleRate*.475), edges=Array.from({length:BANDS+1},(_,i)=>Math.round(40*Math.pow(top/40,i/BANDS)/sampleRate*FFT_SIZE));
-  const power=new Float64Array(frames*BANDS), re=new Float64Array(FFT_SIZE), im=new Float64Array(FFT_SIZE);let loudest=1e-12;
+  const power=new Float64Array(frames*BANDS), re=new Float64Array(FFT_SIZE), im=new Float64Array(FFT_SIZE), bins=new Float64Array(FFT_SIZE/2);let loudest=1e-12;
   for(let t=0;t<frames;t++){
     // Each channel is measured on its own, so opposite-phase stereo never cancels.
-    const begin=Math.round(t*hop)-FFT_SIZE/2;
-    for(const pcm of channels){
-      for(let i=0;i<FFT_SIZE;i++){const k=begin+i;re[i]=k>=0&&k<length?pcm[k]*window[i]:0;im[i]=0;}
-      fft(re,im);
-      for(let b=0;b<BANDS;b++){const from=edges[b],to=Math.max(from+1,edges[b+1]);let sum=0;for(let k=from;k<to;k++)sum+=re[k]*re[k]+im[k]*im[k];power[t*BANDS+b]+=sum;}
-    }
+    channelPower(channels,Math.round(t*hop)-FFT_SIZE/2,length,window,re,im,bins);
+    for(let b=0;b<BANDS;b++){const from=edges[b],to=Math.max(from+1,edges[b+1]);let sum=0;for(let k=from;k<to;k++)sum+=bins[k];power[t*BANDS+b]=sum;}
     for(let b=0;b<BANDS;b++)loudest=Math.max(loudest,power[t*BANDS+b]);
     if(t%2000===0)onProgress(.8*t/frames);
   }
@@ -175,13 +196,7 @@ function spectrumReader(channels,sampleRate,size=PITCH_WINDOW){
   const length=channels[0]?.length||0, re=new Float64Array(PITCH_SIZE), im=new Float64Array(PITCH_SIZE), mag=new Float64Array(PITCH_SIZE/2);
   const window=Float32Array.from({length:size},(_,i)=>.5-.5*Math.cos(2*Math.PI*i/size));
   return time=>{
-    mag.fill(0);const begin=Math.round(time*sampleRate-size/2);
-    for(const pcm of channels){
-      re.fill(0);im.fill(0);
-      for(let i=0;i<size;i++){const k=begin+i;if(k>=0&&k<length)re[i]=pcm[k]*window[i];}
-      fft(re,im);
-      for(let k=0;k<PITCH_SIZE/2;k++)mag[k]+=re[k]*re[k]+im[k]*im[k];
-    }
+    channelPower(channels,Math.round(time*sampleRate-size/2),length,window,re,im,mag);
     for(let k=0;k<PITCH_SIZE/2;k++)mag[k]=Math.sqrt(mag[k]);
     return mag;
   };
@@ -197,19 +212,38 @@ function peaks(mag,binHz){
   }
   return out;
 }
-function salience(peak,binHz){
-  const steps=(HIGH_NOTE-LOW_NOTE)*4+1, out=new Float64Array(steps);
-  for(let s=0;s<steps;s++){
-    const f0=hz(LOW_NOTE+s/4);let sum=0;
-    for(let h=1;h<=HARMONICS;h++){
-      const f=f0*h, from=Math.max(1,Math.floor(f*.9715/binHz)), to=Math.min(peak.length-1,Math.ceil(f*1.0293/binHz));
-      if(from>=peak.length)break;
-      // A harmonic counts most when it sits right on the pitch, less as it drifts up to half a semitone away.
-      let top=0;for(let k=from;k<=to;k++)if(peak[k])top=Math.max(top,peak[k]*Math.cos(Math.PI*6*Math.log2(k*binHz/f))**2);
-      sum+=top*Math.pow(.8,h-1);
+// Where each candidate pitch's harmonics fall, and how much each nearby bin
+// counts, depend only on the bin width, so they are worked out once, listed
+// by bin: a frame then only visits the few bins that hold a peak.
+const harmonicTables=new Map();
+function harmonicBins(binHz,bins){
+  const key=binHz+'/'+bins;let t=harmonicTables.get(key);
+  if(!t){
+    const steps=(HIGH_NOTE-LOW_NOTE)*4+1,byBin=Array.from({length:bins},()=>[]);
+    for(let s=0;s<steps;s++){
+      const f0=hz(LOW_NOTE+s/4);
+      for(let h=1;h<=HARMONICS;h++){
+        const f=f0*h, from=Math.max(1,Math.floor(f*.9715/binHz)), to=Math.min(bins-1,Math.ceil(f*1.0293/binHz));
+        // A harmonic counts most when it sits right on the pitch, less as it drifts up to half a semitone away.
+        for(let k=from;k<=to;k++)byBin[k].push(s*HARMONICS+h-1,Math.cos(Math.PI*6*Math.log2(k*binHz/f))**2*Math.pow(.8,h-1));
+      }
     }
-    out[s]=sum;
+    const starts=new Uint32Array(bins+1),slot=[],weight=[];
+    byBin.forEach((list,k)=>{starts[k]=slot.length;for(let i=0;i<list.length;i+=2){slot.push(list[i]);weight.push(list[i+1]);}});
+    starts[bins]=slot.length;
+    harmonicTables.set(key,t={steps,starts,slot:Uint32Array.from(slot),weight:Float64Array.from(weight),top:new Float64Array(steps*HARMONICS)});
   }
+  return t;
+}
+// Each candidate pitch scores the loudest peak near each of its harmonics.
+function salience(peak,binHz){
+  const {steps,starts,slot,weight,top}=harmonicBins(binHz,peak.length), out=new Float64Array(steps);
+  top.fill(0);
+  for(let k=1;k<peak.length;k++){
+    const p=peak[k];if(!p)continue;
+    for(let i=starts[k],end=starts[k+1];i<end;i++){const v=p*weight[i];if(v>top[slot[i]])top[slot[i]]=v;}
+  }
+  for(let s=0;s<steps;s++){let sum=0;for(let h=0;h<HARMONICS;h++)sum+=top[s*HARMONICS+h];out[s]=sum;}
   return out;
 }
 // The tune, 25 times a second: the loudest pitch wherever one rings out clearly (0 where none does).

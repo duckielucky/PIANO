@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { TRACKS, MELODY, melodyNote, makeChart, songSection, gradeTiming, Run } from '../dist/engine.js';
+import { TRACKS, MELODY, melodyNote, makeChart, songSection, gradeTiming, Run, syncStep, SYNC_RANGE, HARD_WINDOWS } from '../dist/engine.js';
 test('timing windows are symmetric and reject off-beat taps',()=>{
   assert.equal(gradeTiming(.07),'perfect');assert.equal(gradeTiming(-.13),'great');assert.equal(gradeTiming(.22),'good');assert.equal(gradeTiming(.28),null);assert.equal(gradeTiming(-.28),null);
 });
@@ -77,4 +77,30 @@ test('built-in lanes play the lead like piano keys: up moves right, down moves l
       assert.equal(new Set(chart.map(n=>n.lane)).size,4);
     }
   }
+});
+test('Expert judges tighter and misses cost more energy',()=>{
+  assert.equal(gradeTiming(.07,HARD_WINDOWS),'great');assert.equal(gradeTiming(.2,HARD_WINDOWS),null);
+  const notes=Array.from({length:30},(_,i)=>({id:i,lane:0,time:i,type:'tap',duration:0,status:'pending'}));
+  const hard=new Run(notes.map(n=>({...n})),'hard'),normal=new Run(notes.map(n=>({...n})),'normal');
+  for(let i=0;i<10;i++){hard.judge(hard.notes[i],'miss');normal.judge(normal.notes[i],'miss');}
+  assert.ok(hard.energy<normal.energy);assert.equal(hard.candidate(0,10.19),undefined);assert.ok(normal.candidate(0,10.19));
+});
+test('sound delay is caught up from taps, and stray taps move nothing',()=>{
+  assert.equal(syncStep([.2,.2,.2]),0);
+  assert.equal(syncStep(Array(8).fill(.01)),0);
+  assert.equal(syncStep(Array(8).fill(.3)),.03);assert.equal(syncStep(Array(8).fill(-.3)),-.03);
+  assert.equal(syncStep([.5,-.4,0,0,0,0,0,0,.01,-.01]),0);
+  // A player on Bluetooth hears everything 220 ms late and taps on what they hear (give or take 30 ms).
+  const delay=.22;let offset=0,samples=[],since=0,taps=0;
+  for(;taps<200&&Math.abs(offset-delay)>.02;taps++){
+    samples.push(delay-offset+(taps%5-2)*.015);if(samples.length>16)samples.shift();
+    if(++since<4)continue;
+    const step=syncStep(samples);if(!step)continue;
+    const next=Math.max(SYNC_RANGE[0],Math.min(SYNC_RANGE[1],offset+step));samples=samples.map(e=>e-(next-offset));offset=next;since=0;
+  }
+  assert.ok(Math.abs(offset-delay)<=.02,'caught up to '+offset);assert.ok(taps<=60,'took '+taps+' taps');
+});
+test('the game learns the sound delay from taps and offers it to adjust',()=>{
+  const game=readFileSync(new URL('../dist/game.js',import.meta.url),'utf8'),audio=readFileSync(new URL('../dist/audio.js',import.meta.url),'utf8');
+  assert.match(game,/learnSync\(lane,t\);const n=run\.candidate/);assert.match(game,/data-sync="-1"/);assert.match(audio,/-this\.offset-this\.startTime/);
 });

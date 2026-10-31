@@ -1,6 +1,6 @@
 // Original procedural soundtrack. All playback and note timing share this audio clock.
 export class Soundtrack {
-  constructor() { this.ctx = null; this.nodes = new Set(); this.muted = false; this.timer = null; }
+  constructor() { this.ctx = null; this.nodes = new Set(); this.muted = false; this.timer = null; this.offset = 0; }
   ensureContext() {
     if (!this.ctx) {
       this.ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -62,8 +62,10 @@ export class Soundtrack {
   }
   // What you hear lags the clock by the device's output delay (large on
   // Bluetooth); notes follow the sound you hear, not the sound being sent.
+  // Not every browser reports that delay, so the player's own sound delay
+  // (learned from their taps, or set by hand) is taken off as well.
   get latency(){const c=this.ctx;if(!c)return 0;const v=(Number(c.outputLatency)||0)+(Number(c.baseLatency)||0);return Math.min(.5,Math.max(0,v));}
-  get time(){return this.ctx?this.ctx.currentTime-this.latency-this.startTime:0;}
+  get time(){return this.ctx?this.ctx.currentTime-this.latency-this.offset-this.startTime:0;}
   async pause(){if(this.ctx?.state==='running')await this.ctx.suspend();}
   async resume(){await this.unlock();this.schedule();}
   setMuted(value){this.muted=value;if(this.master)this.master.gain.setTargetAtTime(value?0:.6,this.ctx.currentTime,.02);}

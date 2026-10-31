@@ -1,9 +1,9 @@
-import { TRACKS, makeChart, trackMap, gradeTiming, gradeAccuracy, Run } from './engine.js?v=162ad3d619';
-import { Soundtrack } from './audio.js?v=71ed956385';
-import { makeAudioChart, beatMap, ANALYSIS_VERSION } from './beat-analysis.js?v=8d08951fa7';
-import { importSong } from './song-import.js?v=6eae3c8235';
+import { TRACKS, makeChart, trackMap, gradeTiming, gradeAccuracy, Run, syncStep, SYNC_RANGE } from './engine.js?v=275d90bbc1';
+import { Soundtrack } from './audio.js?v=d68ed20822';
+import { makeAudioChart, beatMap, ANALYSIS_VERSION } from './beat-analysis.js?v=5c36b5d508';
+import { importSong } from './song-import.js?v=89509aad09';
 import { listSongs, saveSong, deleteSong, MAX_SONGS } from './song-library.js?v=8ebd178751';
-import { chooseLanguage, translate } from './i18n.js?v=3813ddef73';
+import { chooseLanguage, translate } from './i18n.js?v=22cff80108';
 
 const $ = s => document.querySelector(s);
 const canvas=$('#canvas'), ctx=canvas.getContext('2d'), stage=$('#stage'), modal=$('#modal');
@@ -95,7 +95,7 @@ function songMenuContent(){
 }
 function difficultyContent(){
   const notes=track.uploaded?makeAudioChart(track.analysis,difficulty):makeChart(track,difficulty);
-  return `<h2>${t('chooseDifficulty')}</h2><div class="selected-track"><span class="song-symbol" aria-hidden="true">♫</span><div><small>${t('selectedSong')}</small><strong>${escapeHtml(trackTitle(track))}</strong><span>${songFacts(track,duration())}</span></div></div><div class="difficulty-cards" role="group" aria-label="${t('difficulty')}">`+['easy','normal','hard'].map((value,i)=>`<button class="difficulty-card ${value===difficulty?'selected':''}" data-difficulty="${value}" aria-pressed="${value===difficulty}"><span class="difficulty-bars" aria-hidden="true">${[0,1,2].map(n=>`<i class="${n<=i?'lit':''}"></i>`).join('')}</span><strong>${t(value)}</strong><small>${t(value+'Hint')}</small></button>`).join('')+`</div><div class="setup-summary" role="status"><span>${t('noteCount',{count:notes.length})}</span><span>${t(difficulty==='easy'?'noFail':'tapHold')}</span></div><p class="setup-tune">${t('followsTune')}</p>${track.uploaded&&track.analysis.weakBeat?`<p class="setup-warning">${t('weakBeat')}</p>`:''}<button class="primary-button setup-start" data-action="start-game"><span aria-hidden="true">▶</span>${t('startGame')}</button>`;
+  return `<h2>${t('chooseDifficulty')}</h2><div class="selected-track"><span class="song-symbol" aria-hidden="true">♫</span><div><small>${t('selectedSong')}</small><strong>${escapeHtml(trackTitle(track))}</strong><span>${songFacts(track,duration())}</span></div></div><div class="difficulty-cards" role="group" aria-label="${t('difficulty')}">`+['easy','normal','hard'].map((value,i)=>`<button class="difficulty-card ${value===difficulty?'selected':''}" data-difficulty="${value}" aria-pressed="${value===difficulty}"><span class="difficulty-bars" aria-hidden="true">${[0,1,2].map(n=>`<i class="${n<=i?'lit':''}"></i>`).join('')}</span><strong>${t(value)}</strong><small>${t(value+'Hint')}</small></button>`).join('')+`</div><div class="setup-summary" role="status"><span>${t('noteCount',{count:notes.length})}</span><span>${t(difficulty==='easy'?'noFail':'tapHold')}</span></div><div class="setup-extras"><p class="setup-tune">${t('followsTune')}</p>${syncRow()}</div>${track.uploaded&&track.analysis.weakBeat?`<p class="setup-warning">${t('weakBeat')}</p>`:''}<button class="primary-button setup-start" data-action="start-game"><span aria-hidden="true">▶</span>${t('startGame')}</button>`;
 }
 $('#songFile').addEventListener('change',event=>loadSongs(event.target.files));
 modal.addEventListener('dragover',event=>{if(dialogType==='import'){event.preventDefault();modal.classList.add('file-dragover');}});
@@ -155,6 +155,23 @@ function beatAt(grid,t){
 }
 const duration=()=>track.duration??track.bars*4*60/track.bpm;
 const bestKey=()=>`neon-rush-tap-hold-best-${track.id}-${difficulty}`;
+// The player's sound delay, kept on this device.
+const clampSync=v=>Math.round(Math.max(SYNC_RANGE[0],Math.min(SYNC_RANGE[1],v))*1000)/1000;
+try{audio.offset=clampSync(Number(localStorage.getItem('vipermix-sound-delay'))||0);}catch{}
+function setSync(value){audio.offset=clampSync(value);try{localStorage.setItem('vipermix-sound-delay',String(audio.offset));}catch{}}
+const syncText=()=>t('soundDelayValue',{ms:Math.round(audio.offset*1000)});
+const syncRow=()=>`<div class="sync-row"><div><strong>${t('soundDelay')}</strong><small>${t('soundDelayHint')}</small></div><div class="sync-controls"><button class="sync-button" data-sync="-1" aria-label="${t('soundDelayLess')}">−</button><output role="status">${syncText()}</output><button class="sync-button" data-sync="1" aria-label="${t('soundDelayMore')}">+</button></div></div>`;
+let syncSamples=[],sinceSync=0;
+// A tap near a note, scored or not, tells how late this player hears the song.
+function learnSync(lane,t){
+  let near=null;for(const n of run.notes)if(n.lane===lane&&(n.status==='pending'||n.status==='miss')&&Math.abs(t-n.time)<.4&&(!near||Math.abs(t-n.time)<Math.abs(t-near.time)))near=n;
+  if(!near)return;
+  syncSamples.push(t-near.time);if(syncSamples.length>16)syncSamples.shift();
+  if(++sinceSync<4)return;
+  const step=syncStep(syncSamples);if(!step)return;
+  const before=audio.offset;setSync(before+step);const moved=audio.offset-before;
+  syncSamples=syncSamples.map(e=>e-moved);sinceSync=0;
+}
 function readBest(){try{return Number(localStorage.getItem(bestKey()))||0;}catch{return 0;}}
 function saveBest(score){try{localStorage.setItem(bestKey(),String(score));}catch{}}
 const format=n=>Math.round(n).toString().padStart(7,'0');
@@ -276,14 +293,14 @@ async function start(){
   const token=++session; closeModal();$('#playButton').disabled=true;
   try{await audio.unlock();await prepare(track);}catch(e){$('#playButton').disabled=false;showError();return;}
   if(token!==session)return;
-  run=new Run(track.uploaded?makeAudioChart(track.analysis,difficulty):makeChart(track,difficulty),difficulty);lastScore=lastCombo=lastEnergy=-1;keys.clear();pointers.clear();particles=[];ripples=[];lastCountdown=null;
+  run=new Run(track.uploaded?makeAudioChart(track.analysis,difficulty):makeChart(track,difficulty),difficulty);syncSamples=[];sinceSync=0;lastScore=lastCombo=lastEnergy=-1;keys.clear();pointers.clear();particles=[];ripples=[];lastCountdown=null;
   audio.start(track,track.uploaded?travel()+.35:0);setMode('countdown');$('#menu').hidden=true;$('#pauseButton').disabled=false;$('#nextTrack').hidden=true;$('#trackButton').disabled=true;$('#playingBars').hidden=false;$('#countdown').hidden=false;$('#playButton').disabled=false;$('#songProgress').style.width='0%';updateHUD();
 }
 function showError(){showDialog('error');}
 function isLaneDown(lane){return keys.has(lane)||[...pointers.values()].some(p=>p.lane===lane);}
 function press(lane){
   if(mode!=='playing')return;
-  flashes[lane]=.7;const t=audio.time,n=run.candidate(lane,t);if(!n)return;
+  flashes[lane]=.7;const t=audio.time;learnSync(lane,t);const n=run.candidate(lane,t);if(!n)return;
   const rating=gradeTiming(t-n.time,run.windows);
   if(n.type==='hold'){n.status='holding';n.holdGrade=rating;n.error=t-n.time;burst(lane,'#c898ff');}
   else judge(n,rating,t-n.time);
@@ -349,7 +366,7 @@ function renderDialog(){
   let content='';
   if(dialogType==='import')content=importContent();
   if(dialogType==='error')content=`<div class="eyebrow">${t('retry')}</div><h2>${t('oneMoreBeat')}</h2><p>${t('audioError')}</p><button class="primary-button" data-action="close">${t('gotIt')}</button>`;
-  if(dialogType==='pause')content=`<h2><em>${t('paused')}</em></h2><button class="primary-button" data-action="resume">${t('resume')} <span>▶</span></button><button class="secondary-button" data-action="restart">${t('restart')}</button><button class="secondary-button" data-action="home">${t('menu')}</button>`;
+  if(dialogType==='pause')content=`<h2><em>${t('paused')}</em></h2>${syncRow()}<button class="primary-button" data-action="resume">${t('resume')} <span>▶</span></button><button class="secondary-button" data-action="restart">${t('restart')}</button><button class="secondary-button" data-action="home">${t('menu')}</button>`;
   if(dialogType==='help')content=`<h2>${t('tap')} <em>+ ${t('hold')}</em></h2><div class="tutorial-row"><div class="note-demo"><span class="note-icon tap"></span></div><div><strong>${t('tap')}</strong><p>${t('tapHelp')}</p></div></div><div class="tutorial-row"><div class="note-demo"><span class="note-icon hold"></span></div><div><strong>${t('hold')}</strong><p>${t('holdHelp')}</p></div></div><p class="key-hint">${t('keyboardHelp')}</p><button class="primary-button" data-action="close">${t('gotIt')}</button>`;
   if(dialogType==='tracks')content=songMenuContent();
   if(dialogType==='difficulty')content=difficultyContent();
@@ -379,6 +396,8 @@ $('#modalContent').addEventListener('click',e=>{
     if(item.uploaded&&item.analysis?.version!==ANALYSIS_VERSION&&item.file){loadSongs([new File([item.file],item.file.name||item.title,{type:item.file.type})]);return;}
     setTrack(item);prepare(item).catch(()=>{});showDialog('difficulty');
   }
+  const sync=e.target.closest('[data-sync]')?.dataset.sync;
+  if(sync){setSync(audio.offset+Number(sync)*.01);syncSamples=[];$('#modalContent .sync-row output').textContent=syncText();return;}
   const choice=e.target.closest('[data-difficulty]')?.dataset.difficulty;
   if(choice){setDifficulty(choice);renderDialog();$(`[data-difficulty="${choice}"]`).focus();}
 });

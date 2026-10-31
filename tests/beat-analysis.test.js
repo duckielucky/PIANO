@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {analyzePcm,makeAudioChart,beatMap,ANALYSIS_VERSION} from '../dist/beat-analysis.js';
+import {analyzePcm,makeAudioChart,beatMap,spectralFlux,ANALYSIS_VERSION} from '../dist/beat-analysis.js';
 // Playable on a phone: lanes in range, nothing past the end, no lane reused within
 // .18 s of its last note ending, at most two lanes at once (never on Chill), and
 // notes cleared before the next one starts.
@@ -179,4 +179,12 @@ test('lanes follow the tune: higher notes to the right, lower to the left, repea
     assert.ok(pairs>8&&agree>=pairs*.85,difficulty+' lanes move with the tune: '+agree+' of '+pairs);
     assert.ok(new Set(chart.map(n=>n.lane)).size===4,difficulty+' uses every lane');
   }
+});
+test('stereo shares one FFT but each channel is still heard on its own',()=>{
+  const rate=11025,x=new Float32Array(rate*4);
+  for(let i=0;i<x.length;i++){const t=i/rate,beat=t%.5;x[i]=Math.sin(2*Math.PI*220*t)*.2+(beat<.05?Math.sin(2*Math.PI*90*t)*(1-beat/.05):0)*.8+Math.sin(i*12.9898)*.01;}
+  const mono=spectralFlux([x],rate),same=spectralFlux([x,x],rate),opposite=spectralFlux([x,x.map(v=>-v)],rate);
+  const right=x.map((v,i)=>i%rate<rate/2?v:0),mixed=spectralFlux([x,right],rate);
+  for(let i=0;i<mono.length;i++){assert.ok(Math.abs(mono[i]-same[i])<1e-6);assert.ok(Math.abs(mono[i]-opposite[i])<1e-6);}
+  assert.ok(mixed.some((v,i)=>Math.abs(v-mono[i])>1e-3),'a different right channel changes the pulse');
 });
