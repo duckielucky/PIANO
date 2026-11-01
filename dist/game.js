@@ -3,7 +3,7 @@ import { Soundtrack } from './audio.js?v=d68ed20822';
 import { makeAudioChart, beatMap, ANALYSIS_VERSION } from './beat-analysis.js?v=5c36b5d508';
 import { importSong } from './song-import.js?v=89509aad09';
 import { listSongs, saveSong, deleteSong, MAX_SONGS } from './song-library.js?v=8ebd178751';
-import { chooseLanguage, translate } from './i18n.js?v=3701e9ba99';
+import { chooseLanguage, translate } from './i18n.js?v=46a29ef48c';
 
 const $ = s => document.querySelector(s);
 const canvas=$('#canvas'), stage=$('#stage'), modal=$('#modal');
@@ -366,11 +366,11 @@ function updateHUD(){
 }
 async function start(){
   if(mode==='playing'||mode==='countdown')return;
-  const token=++session; closeModal();$('#playButton').disabled=true;
-  try{await audio.unlock();await prepare(track);}catch(e){$('#playButton').disabled=false;showError();return;}
+  const token=++session; closeModal();
+  try{await audio.unlock();await prepare(track);}catch(e){showError();return;}
   if(token!==session)return;
   run=new Run(track.uploaded?makeAudioChart(track.analysis,difficulty):makeChart(track,difficulty),difficulty);syncSamples=[];sinceSync=0;cheerUntil=cheerRank=0;perfectRun=missRun=lastLevel=0;lowEnergy=false;$('#cheer').classList.remove('show');lastScore=lastCombo=lastEnergy=-1;keys.clear();pointers.clear();particles=[];ripples=[];lastCountdown=null;
-  audio.start(track,track.uploaded?travel()+.35:0);setMode('countdown');$('#menu').hidden=true;$('#pauseButton').disabled=false;$('#nextTrack').hidden=true;$('#trackButton').disabled=true;$('#playingBars').hidden=false;$('#countdown').hidden=false;$('#playButton').disabled=false;$('#songProgress').style.width='0%';updateHUD();
+  audio.start(track,track.uploaded?travel()+.35:0);setMode('countdown');$('#pauseButton').disabled=false;$('#nextTrack').hidden=true;$('#trackButton').disabled=true;$('#playingBars').hidden=false;$('#countdown').hidden=false;$('#songProgress').style.width='0%';updateHUD();
 }
 function showError(){showDialog('error');}
 function isLaneDown(lane){return keys.has(lane)||[...pointers.values()].some(p=>p.lane===lane);}
@@ -413,7 +413,8 @@ async function resume(){
   closeModal();setMode(audio.time<0?'countdown':'playing');$('#playingBars').classList.remove('paused-bars');
 }
 function goHome(){
-  session++;audio.stop();closeModal();setMode('menu');run=null;keys.clear();pointers.clear();$('#menu').hidden=false;$('#countdown').hidden=true;$('#comboBox').classList.remove('visible');$('#judgment').classList.remove('show');$('#pauseButton').disabled=true;$('#nextTrack').hidden=false;$('#trackButton').disabled=false;$('#playingBars').hidden=true;$('#playingBars').classList.remove('paused-bars');$('#score').textContent='0000000';$('#energyFill').style.width='100%';$('#energyFill').style.background='var(--brand-gradient)';$('#judgment').textContent='';delete $('#judgment').dataset.result;$('#energyText').textContent='100%';$('#songProgress').style.width='0%';$('#best').textContent=format(readBest());
+  session++;audio.stop();closeModal();setMode('menu');run=null;keys.clear();pointers.clear();$('#countdown').hidden=true;$('#comboBox').classList.remove('visible');$('#judgment').classList.remove('show');$('#pauseButton').disabled=true;$('#nextTrack').hidden=false;$('#trackButton').disabled=false;$('#playingBars').hidden=true;$('#playingBars').classList.remove('paused-bars');$('#score').textContent='0000000';$('#energyFill').style.width='100%';$('#energyFill').style.background='var(--brand-gradient)';$('#judgment').textContent='';delete $('#judgment').dataset.result;$('#energyText').textContent='100%';$('#songProgress').style.width='0%';$('#best').textContent=format(readBest());
+  trackMenu();
 }
 function finish(reason='complete'){
   if(mode==='results')return;setMode('results');audio.stop();$('#pauseButton').disabled=true;$('#playingBars').hidden=true;$('#comboBox').classList.remove('visible');
@@ -428,21 +429,27 @@ function closeModal(){
 function showDialog(type){dialogType=type;renderDialog();if(!modal.open)modal.showModal();}
 function help(){showDialog('help');}
 function trackMenu(){if(mode==='menu')showDialog('tracks');}
+// The song list is home: leaving a game lands there, and leaving the song
+// list goes back to the start screen, so the stage is never left empty.
 function backToSongs(){
-  if(mode!=='menu')goHome();else closeModal();
-  trackMenu();
+  if(mode!=='menu')goHome();else trackMenu();
+}
+function dismiss(){
+  if(!$('#startScreen').hidden||mode!=='menu')closeModal();
+  else if(dialogType==='tracks')showStart();
+  else trackMenu();
 }
 function backDialog(){
   if(dialogType==='difficulty'||dialogType==='import')backToSongs();
   else if(dialogType==='results')goHome();
-  else closeModal();
+  else dismiss();
 }
 function renderDialog(){
   modal.dataset.dialog=dialogType;
   let content='';
   if(dialogType==='import')content=importContent();
   if(dialogType==='error')content=`<div class="eyebrow">${t('retry')}</div><h2>${t('oneMoreBeat')}</h2><p>${t('audioError')}</p><button class="primary-button" data-action="close">${t('gotIt')}</button>`;
-  if(dialogType==='pause')content=`<h2><em>${t('paused')}</em></h2>${syncRow()}<button class="primary-button" data-action="resume">${t('resume')} <span>▶</span></button><button class="secondary-button" data-action="restart">${t('restart')}</button><button class="secondary-button" data-action="home">${t('menu')}</button>`;
+  if(dialogType==='pause')content=`<h2><em>${t('paused')}</em></h2>${syncRow()}<button class="primary-button" data-action="resume">${t('resume')} <span>▶</span></button><button class="secondary-button" data-action="restart">${t('restart')}</button><button class="secondary-button" data-action="home">${t('changeSong')}</button>`;
   if(dialogType==='help')content=`<h2>${t('tap')} <em>+ ${t('hold')}</em></h2><div class="tutorial-row"><div class="note-demo"><span class="note-icon tap"></span></div><div><strong>${t('tap')}</strong><p>${t('tapHelp')}</p></div></div><div class="tutorial-row"><div class="note-demo"><span class="note-icon hold"></span></div><div><strong>${t('hold')}</strong><p>${t('holdHelp')}</p></div></div><p class="key-hint">${t('keyboardHelp')}</p><button class="primary-button" data-action="close">${t('gotIt')}</button>`;
   if(dialogType==='tracks')content=songMenuContent();
   if(dialogType==='difficulty')content=difficultyContent();
@@ -460,7 +467,7 @@ $('#modalContent').addEventListener('click',e=>{
   if(action==='choose-file')chooseFile();
   if(action==='start-game'&&dialogType==='difficulty')start();
   if(action==='back-songs')backToSongs();
-  if(action==='close')closeModal();if(action==='resume')resume();if(action==='restart')start();if(action==='home')goHome();
+  if(action==='close')dismiss();if(action==='resume')resume();if(action==='restart')start();if(action==='home')goHome();
   const remove=e.target.closest('[data-remove]')?.dataset.remove;
   if(remove){if(removing===remove){removing='';removeMySong(remove);}else removing=remove;renderDialog();$(`[data-remove="${remove}"]`)?.focus();return;}
   if(removing){removing='';if(dialogType==='tracks')renderDialog();}
@@ -479,10 +486,12 @@ $('#modalContent').addEventListener('click',e=>{
 });
 modal.addEventListener('cancel',e=>{e.preventDefault();if(dialogType==='pause')resume();else backDialog();});
 // The game opens on a start screen; PLAY there leads straight to choosing a song.
-function leaveStart(){const screen=$('#startScreen');if(!screen||screen.hidden)return;screen.classList.add('leaving');document.body.classList.remove('at-start');setTimeout(()=>{screen.hidden=true;},350);trackMenu();}
+let startTimer=0;
+function leaveStart(){const screen=$('#startScreen');if(!screen||screen.hidden)return;screen.classList.add('leaving');document.body.classList.remove('at-start');startTimer=setTimeout(()=>{screen.hidden=true;},350);trackMenu();}
+function showStart(){clearTimeout(startTimer);closeModal();const screen=$('#startScreen');screen.hidden=false;screen.classList.remove('leaving');document.body.classList.add('at-start');$('#startButton').focus({preventScroll:true});}
 listSongs().then(records=>{myTracks=[...myTracks,...records.filter(record=>!myTracks.some(item=>item.id===record.id)).map(fromRecord)];if(dialogType==='tracks'&&modal.open)renderDialog();}).catch(()=>{});
 document.body.classList.add('at-start');$('#startButton').addEventListener('click',leaveStart);$('#startButton').focus({preventScroll:true});
-$('#playButton').addEventListener('click',trackMenu);$('#pauseButton').addEventListener('click',pause);$('#helpButton').addEventListener('click',help);$('#trackButton').addEventListener('click',trackMenu);
+$('#pauseButton').addEventListener('click',pause);$('#helpButton').addEventListener('click',help);$('#trackButton').addEventListener('click',trackMenu);
 $('#soundButton').addEventListener('click',()=>{audio.setMuted(!audio.muted);syncSoundLabel();$('#soundButton').style.color=audio.muted?'#ff7b9f':'';$('#soundButton').innerHTML=audio.muted?'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m11 5-6 4H2v6h3l6 4zM16 9l6 6M22 9l-6 6"/></svg>':'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m11 5-6 4H2v6h3l6 4zM15 8a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14"/></svg>';});
 $('#fullscreenButton').addEventListener('click',async()=>{try{if(document.fullscreenElement){await document.exitFullscreen();screen.orientation?.unlock?.();}else if(document.documentElement.requestFullscreen){await document.documentElement.requestFullscreen();try{await screen.orientation?.lock?.('landscape');}catch{}}}catch{}});
 document.addEventListener('visibilitychange',()=>{if(document.hidden)pause();});window.addEventListener('blur',()=>{if(mode==='playing'||mode==='countdown')pause();});
@@ -491,13 +500,7 @@ function frame(now){
   const dt=mode==='paused'?0:Math.min(.05,(now-lastFrame)/1000||.016);lastFrame=now;visualTime+=dt;
   const playing=mode==='playing'||mode==='countdown',t=playing||mode==='paused'?audio.time:now/1000;
   highway(t);
-  if(mode==='menu'){
-    // A slow-moving preview gives the menu the same spatial feel as gameplay.
-    for(let i=0;i<7;i++){
-      const f=((i*.153+(reducedMotion?0:visualTime*.09))%.96);
-      const n={lane:[0,3,1,2,0,2,3,1,2][i],type:i===2||i===7?'hold':'tap',duration:.5};noteBlock(n,f);
-    }
-  }else if(run){
+  if(run){
     if(playing){
       if(t<0){const count=Math.min(3,Math.ceil(-t/(60/track.bpm)));$('#countdown').hidden=false;if(count!==lastCountdown){lastCountdown=count;$('#countdown').textContent=count;pop($('#countdown'));}}
       else if(mode==='countdown'){setMode('playing');$('#countdown').hidden=true;}

@@ -33,13 +33,7 @@ body::before {background: radial-gradient(ellipse at 50% 65%, #6633a914, transpa
 .lane-inputs span {font-family:var(--ui);color:#b6a1d3;opacity:.75}
 .combo strong,.judgment,.countdown {font-family:var(--ui);font-style:normal;font-weight:800;letter-spacing:-1px}
 .combo span {color:#c3b3dd}.countdown{background:#120a2433}
-.menu-overlay {background:linear-gradient(145deg,#28134480,#130b2699);border-color:var(--line)}
-.ready-chip {padding:6px 10px;border:1px solid #ae80ff26;border-radius:999px;background:#9c5af710;color:#d8c7ed;letter-spacing:1px}
-.ready-chip>span:first-child {background:#b98aff;box-shadow:0 0 8px #9c5af788}
 h2,dialog h2 {font-family:var(--ui);font-style:normal;font-weight:800;letter-spacing:-1.5px;line-height:1.1}
-.menu-title {gap:8px;margin:20px 0 27px}
-.menu-title span {font-family:var(--ui);font-size:15px;font-weight:600;letter-spacing:1.6px;color:#d4c6e7}
-.menu-title em {font-size:55px;font-style:normal;line-height:1.05;letter-spacing:-3px;background:linear-gradient(110deg,#d0a6ff 10%,#a77af9 52%,#81b2ff);background-clip:text;-webkit-background-clip:text;color:transparent}
 .difficulty-selector {border-color:#ac88ff2b;background:#150c29;border-radius:12px;padding:4px}
 .difficulty-selector button {color:#c0b4d2;border-radius:8px;letter-spacing:.5px}
 .difficulty-selector button.selected {background:linear-gradient(135deg,#7c5bf559,#5b4be040);color:white;box-shadow:inset 0 0 0 1px #c0a0ff30,0 2px 8px #08020f33}
@@ -70,10 +64,10 @@ dialog .secondary-button:hover {background:#9c5af726}
 .orientation-hint {background:radial-gradient(ellipse at 50% 45%,#6e329d1a,transparent 60%),linear-gradient(180deg,#150927,#100a21)}
 .orientation-hint h2 {font-size:42px;line-height:1.1}.orientation-hint h2 em{font-style:normal;color:#c898ff}
 @keyframes button-breathe {0%,100%{box-shadow:0 4px 22px #9c5af72a}50%{box-shadow:0 4px 32px #7c5bf557}}
-@media(max-width:1000px) {.wordmark{font-size:18px}.menu-title span{font-size:13px}.menu-title em{font-size:44px}.menu-title{margin:17px 0 22px}}
-@media(orientation:landscape) and (max-height:540px) {body{background:linear-gradient(180deg,#150927,#100a21)}.phone{box-shadow:none}.menu-title{margin:13px 0 17px}.menu-title em{font-size:43px}.menu-title span{font-size:12px}.ready-chip{padding:5px 9px}.scoreboard strong{font-size:21px}.best-score strong{font-size:14px}.text-button{font-size:8px}dialog h2{font-size:27px;letter-spacing:-1px}.result-grade{font-size:38px}}
-@media(orientation:landscape) and (max-height:350px) {.menu-title em{font-size:35px}.menu-title{margin:8px 0 11px}.ready-chip{padding:4px 8px}}
-@media(orientation:portrait) {.portrait-fallback .menu-overlay{background:linear-gradient(0deg,#100a21 0%,#120a24ee 28%,#15092788 57%,transparent 85%)}.portrait-fallback .menu-title em{font-size:62px}.portrait-fallback .menu-title span{font-size:17px}}
+@media(max-width:1000px) {.wordmark{font-size:18px}}
+@media(orientation:landscape) and (max-height:540px) {body{background:linear-gradient(180deg,#150927,#100a21)}.phone{box-shadow:none}.scoreboard strong{font-size:21px}.best-score strong{font-size:14px}.text-button{font-size:8px}dialog h2{font-size:27px;letter-spacing:-1px}.result-grade{font-size:38px}}
+
+
 
 /* VIPERMIX identity and a persistent English / 简体中文 selector. */
 .wordmark {display:flex;align-items:center;gap:8px;flex-shrink:0}
@@ -87,9 +81,7 @@ dialog .secondary-button:hover {background:#9c5af726}
 .dialog-language .language-button {height:28px;min-width:40px}
 .best-score .label [data-i18n] {color:inherit;padding-left:0}
 .text-button .button-label {display:inline;width:auto;height:auto;border:0;border-radius:0;font:inherit;margin:0}
-html[lang="zh-CN"] .menu-title em {font-size:38px;letter-spacing:1px;line-height:1.2}
-html[lang="zh-CN"] .menu-title span {letter-spacing:2px}
-html[lang="zh-CN"] .label,html[lang="zh-CN"] .stage-meta,html[lang="zh-CN"] .energy span,html[lang="zh-CN"] .ready-chip {font-size:9px;letter-spacing:1px}
+html[lang="zh-CN"] .label,html[lang="zh-CN"] .stage-meta,html[lang="zh-CN"] .energy span{font-size:9px;letter-spacing:1px}
 html[lang="zh-CN"] .difficulty-selector button {font-size:11px;letter-spacing:1px}
 html[lang="zh-CN"] .text-button {font-size:11px;letter-spacing:1px}
 html[lang="zh-CN"] .primary-button {font-size:13px;letter-spacing:2px}
@@ -97,9 +89,9 @@ html[lang="zh-CN"] h2 {letter-spacing:1px}
 html[lang="zh-CN"] .judgment {letter-spacing:3px}
 html[lang="zh-CN"] .cheer strong{letter-spacing:4px;font-style:normal}
 html[lang="zh-CN"] .result-stats span,html[lang="zh-CN"] .result-best {font-size:10px}
-@media(max-width:1000px) {html[lang="zh-CN"] .menu-title em{font-size:29px}.wordmark{gap:5px}.brand-logo{width:51px;height:29px}.brand-name{font-size:16px}}
-@media(orientation:landscape) and (max-height:540px) {.dialog-language{margin-bottom:0}.dialog-language .language-button{height:24px}dialog h2{margin-top:0}html[lang="zh-CN"] .menu-title em{font-size:29px}html[lang="zh-CN"] .menu-title span{font-size:13px}.header-actions{gap:7px}}
-@media(max-width:600px) and (orientation:portrait) {.portrait-fallback .game-header{padding-inline:16px}.brand-logo{width:44px;height:25px}.brand-name{font-size:15px}.header-actions{gap:6px}.language-button{min-width:38px;padding-inline:7px}html[lang="zh-CN"] .portrait-fallback .menu-title em{font-size:44px}}
+@media(max-width:1000px) {.wordmark{gap:5px}.brand-logo{width:51px;height:29px}.brand-name{font-size:16px}}
+@media(orientation:landscape) and (max-height:540px) {.dialog-language{margin-bottom:0}.dialog-language .language-button{height:24px}dialog h2{margin-top:0}.header-actions{gap:7px}}
+@media(max-width:600px) and (orientation:portrait) {.portrait-fallback .game-header{padding-inline:16px}.brand-logo{width:44px;height:25px}.brand-name{font-size:15px}.header-actions{gap:6px}.language-button{min-width:38px;padding-inline:7px}}
 
 .upload-button {display:flex;align-items:center;justify-content:center;gap:7px;width:100%;min-height:36px;margin-top:10px;padding:8px 10px;border:1px solid #ac88ff55;border-radius:11px;background:#9c5af712;color:#e2d1ff;font-size:10px;font-weight:650;letter-spacing:.6px;transition:background .2s,border-color .2s}
 .upload-button:hover {background:#9c5af72b;border-color:#c7a4ff99}
@@ -134,12 +126,9 @@ dialog .import-filename {font-size:16px;color:#eee4ff;font-weight:650;text-align
 .analysis-orbit {display:grid;place-items:center;width:58px;height:58px;border:1px solid #ac88ff55;border-top-color:#e1c5ff;border-radius:50%;font-size:25px;color:#c898ff;margin:12px auto 20px;animation:analysis-pulse 1.4s ease-in-out infinite}
 .import-error {text-align:center;color:#ffb2cc}
 @keyframes analysis-pulse {50%{box-shadow:0 0 30px #9c5af75a;transform:scale(1.06)}}
-@media(orientation:landscape) and (max-height:540px) {dialog[data-dialog="import"]{padding:13px 24px}dialog[data-dialog="import"] h2{font-size:23px;margin:0 0 8px}.audio-dropzone{min-height:110px;gap:6px;padding:10px}.import-hint{margin:6px 0 10px}.audio-waveform{height:34px;margin:10px 0}.menu-overlay .menu-title{margin:10px 0 13px}.menu-overlay .upload-button{min-height:33px;margin-top:8px}.analysis-orbit{margin:0 auto 12px;width:45px;height:45px}.import-filename{margin:9px 0}.menu-overlay .text-button{padding-top:9px}}
-@media(orientation:landscape) and (max-height:350px) {.menu-overlay .menu-title{margin:6px 0 9px}.menu-overlay .menu-title em{font-size:32px}.menu-overlay .upload-button{min-height:30px;padding:6px}.menu-overlay .text-button{padding-top:6px}.menu-overlay .ready-chip{padding:3px 7px}}
-@media(prefers-reduced-motion:reduce) {.analysis-orbit{animation:none}}
+@media(orientation:landscape) and (max-height:540px) {dialog[data-dialog="import"]{padding:13px 24px}dialog[data-dialog="import"] h2{font-size:23px;margin:0 0 8px}.audio-dropzone{min-height:110px;gap:6px;padding:10px}.import-hint{margin:6px 0 10px}.audio-waveform{height:34px;margin:10px 0}.analysis-orbit{margin:0 auto 12px;width:45px;height:45px}.import-filename{margin:9px 0}}
 
-/* Main menu followed by song and difficulty selection. */
-.menu-caption{font-size:10px;line-height:1.6;color:#b7a2d2;text-align:center;margin:14px 0 3px}
+@media(prefers-reduced-motion:reduce) {.analysis-orbit{animation:none}}
 body[data-state="menu"] #nextTrack{display:none}
 dialog[data-dialog="tracks"],dialog[data-dialog="difficulty"]{width:min(680px,calc(100% - 32px));max-width:680px;padding:24px 28px}
 .setup-toolbar{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:18px}
@@ -188,8 +177,8 @@ dialog[data-dialog="pause"] .sync-row{margin:0 0 12px}
 dialog .setup-warning{font-size:10px;line-height:1.4;margin:8px 0 0;color:#c6b0df}
 dialog .setup-start{gap:10px;width:100%;margin-top:15px}
 .song-card:focus-visible,.song-upload:focus-visible,.difficulty-card:focus-visible,.setup-back:focus-visible{outline:2px solid #e8d7ff;outline-offset:3px}
-@media(orientation:landscape) and (max-height:540px){dialog[data-dialog="tracks"],dialog[data-dialog="difficulty"]{padding:15px 22px;width:min(650px,calc(100% - 32px))}.setup-toolbar{margin-bottom:9px}.setup-toolbar .language-button{height:24px}dialog[data-dialog="tracks"] h2,dialog[data-dialog="difficulty"] h2{font-size:23px;margin-bottom:8px}dialog .setup-intro{font-size:10px;margin-bottom:12px}.song-card,.song-upload{min-height:62px;padding:10px;gap:10px}.song-grid{gap:8px}.selected-track{padding:8px 12px;margin:9px 0;gap:10px}.selected-track strong{font-size:12px}.selected-track small{font-size:7px;margin-bottom:2px}.difficulty-card{min-height:87px;padding:10px;gap:5px}.difficulty-card strong{font-size:11px}.difficulty-card small{font-size:9px}.setup-summary{margin-top:9px;font-size:9px}.setup-tune{font-size:9px;margin-top:4px}dialog .setup-start{margin-top:10px;min-height:40px}.menu-caption{font-size:9px;margin-top:10px}}
-@media(max-width:600px) and (orientation:portrait){dialog[data-dialog="tracks"],dialog[data-dialog="difficulty"]{padding:18px}.setup-toolbar{gap:8px}.setup-steps{font-size:8px;gap:5px;letter-spacing:0}.song-grid{grid-template-columns:1fr}.song-card,.song-upload{min-height:70px;padding:12px}.difficulty-cards{gap:7px}.difficulty-card{padding:10px;min-height:105px}.difficulty-card strong{font-size:10px}.difficulty-card small{font-size:9px}dialog[data-dialog="tracks"] h2,dialog[data-dialog="difficulty"] h2{font-size:23px}.menu-caption{font-size:11px}}
+@media(orientation:landscape) and (max-height:540px){dialog[data-dialog="tracks"],dialog[data-dialog="difficulty"]{padding:15px 22px;width:min(650px,calc(100% - 32px))}.setup-toolbar{margin-bottom:9px}.setup-toolbar .language-button{height:24px}dialog[data-dialog="tracks"] h2,dialog[data-dialog="difficulty"] h2{font-size:23px;margin-bottom:8px}dialog .setup-intro{font-size:10px;margin-bottom:12px}.song-card,.song-upload{min-height:62px;padding:10px;gap:10px}.song-grid{gap:8px}.selected-track{padding:8px 12px;margin:9px 0;gap:10px}.selected-track strong{font-size:12px}.selected-track small{font-size:7px;margin-bottom:2px}.difficulty-card{min-height:87px;padding:10px;gap:5px}.difficulty-card strong{font-size:11px}.difficulty-card small{font-size:9px}.setup-summary{margin-top:9px;font-size:9px}.setup-tune{font-size:9px;margin-top:4px}dialog .setup-start{margin-top:10px;min-height:40px}}
+@media(max-width:600px) and (orientation:portrait){dialog[data-dialog="tracks"],dialog[data-dialog="difficulty"]{padding:18px}.setup-toolbar{gap:8px}.setup-steps{font-size:8px;gap:5px;letter-spacing:0}.song-grid{grid-template-columns:1fr}.song-card,.song-upload{min-height:70px;padding:12px}.difficulty-cards{gap:7px}.difficulty-card{padding:10px;min-height:105px}.difficulty-card strong{font-size:10px}.difficulty-card small{font-size:9px}dialog[data-dialog="tracks"] h2,dialog[data-dialog="difficulty"] h2{font-size:23px}}
 
 /* ---- start screen: the first thing you see, one button to begin ---------- */
 .start-screen{position:fixed;inset:0;z-index:15;display:flex;align-items:center;justify-content:center;padding:24px;
@@ -233,3 +222,6 @@ dialog .song-saved-note{margin:8px 0 0;font-size:10px;color:#9a8cb4}
 .song-copy{min-width:0}
 .song-copy strong{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 @media(orientation:landscape) and (max-height:540px){dialog .song-section{margin:11px 0 7px}dialog .import-note{margin-bottom:10px}}
+
+.start-help{margin-top:14px;padding:10px 14px;font-size:11px;letter-spacing:3px;color:#cbbbe6}
+.start-help:focus-visible{outline:2px solid #aa8cff;outline-offset:2px;border-radius:8px}

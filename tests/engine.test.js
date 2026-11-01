@@ -122,3 +122,9 @@ test('every ?v= tag matches its file, so year-long caching never serves an old f
   }
   assert.ok(checked>=15,'tags checked: '+checked);
 });
+test('every element the game looks up by id is on the page',()=>{
+  const game=readFileSync(new URL('../dist/game.js',import.meta.url),'utf8'),html=readFileSync(new URL('../dist/index.html',import.meta.url),'utf8');
+  const ids=new Set([...html.matchAll(/id="([\w-]+)"/g)].map(m=>m[1])),wanted=[...new Set([...game.matchAll(/\$\('#([\w-]+)'\)/g)].map(m=>m[1]))];
+  assert.ok(wanted.length>15);
+  for(const id of wanted)assert.ok(ids.has(id),'#'+id+' is missing from index.html');
+});
