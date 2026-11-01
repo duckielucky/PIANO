@@ -342,7 +342,7 @@ function burst(lane,color='#79b8ff',perfect=false){
   ripples.push({lane,life:.45,color});flares.push({lane,life:.3,color,perfect});
   for(let i=0;i<(perfect?22:14);i++){const white=perfect&&i%3===0;particles.push({x:p.x+(Math.random()-.5)*p.span/8,y:p.y,vx:(Math.random()-.5)*260*scale,vy:(-Math.random()*300-60)*scale,life:.3+Math.random()*.25,color:white?'#ffffff':color,spark:true});}
 }
-// A missed note flashes its lane red; touch players also get a short buzz where phones allow it.
+// A missed note flashes its lane red.
 function missed(lane){missFlashes[lane]=1;}
 function announce(result,lane){
   const el=$('#judgment');el.dataset.result=result;el.textContent=t(result);
