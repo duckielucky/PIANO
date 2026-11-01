@@ -8,14 +8,14 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="description" content="Upload a song and VIPERMIX turns its beats into a rhythm game. Tap blue notes and hold purple notes. Play in English or Chinese.">
   <title>VIPERMIX — Find your rhythm</title>
-  <link rel="icon" href="vipermix-icon.png?v=83b93f0585" type="image/png">
+  <link rel="icon" href="vipermix-icon.png?v=faf2080b37" type="image/png">
   <link rel="stylesheet" href="style.css?v=68a1ae474e">
   <link rel="stylesheet" href="landscape.css?v=173963feb5">
   <link rel="stylesheet" href="theme.css?v=a6ba2a0e21">
 </head>
 <body data-state="menu">
   <main class="phone" id="game" data-i18n-aria="game" aria-label="VIPERMIX rhythm game">
-    <header class="game-header"><a class="wordmark" href="./" data-i18n-aria="home" aria-label="VIPERMIX home"><img class="brand-logo" src="vipermix-logo.webp?v=496b53aff8" alt="VIPERMIX"><span class="brand-name">VIPER<span>MIX</span></span></a><div class="header-actions"><button class="language-button" data-language-toggle aria-label="切换到中文" lang="zh-CN">中文</button><button class="icon-button" id="fullscreenButton" data-i18n-aria="fullscreen" aria-label="Toggle fullscreen" data-i18n-title="fullscreen" title="Fullscreen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5"/></svg></button><button class="icon-button" id="soundButton" aria-label="Mute sound" title="Mute sound"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m11 5-6 4H2v6h3l6 4zM15 8a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14"/></svg></button><button class="icon-button" id="pauseButton" data-i18n-aria="pause" aria-label="Pause game" data-i18n-title="pause" title="Pause (Esc)" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14M16 5v14"/></svg></button></div></header>
+    <header class="game-header"><a class="wordmark" href="./" data-i18n-aria="home" aria-label="VIPERMIX home"><img class="brand-logo" src="vipermix-logo.webp?v=e48ec5e119" alt="VIPERMIX"><span class="brand-name">VIPER<span>MIX</span></span></a><div class="header-actions"><button class="language-button" data-language-toggle aria-label="切换到中文" lang="zh-CN">中文</button><button class="icon-button" id="fullscreenButton" data-i18n-aria="fullscreen" aria-label="Toggle fullscreen" data-i18n-title="fullscreen" title="Fullscreen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5"/></svg></button><button class="icon-button" id="soundButton" aria-label="Mute sound" title="Mute sound"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m11 5-6 4H2v6h3l6 4zM15 8a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14"/></svg></button><button class="icon-button" id="pauseButton" data-i18n-aria="pause" aria-label="Pause game" data-i18n-title="pause" title="Pause (Esc)" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14M16 5v14"/></svg></button></div></header>
     <section class="scoreboard" data-i18n-aria="liveScore" aria-label="Live score"><div><span class="label" data-i18n="score">SCORE</span><strong id="score">0000000</strong></div><div class="best-score"><span class="label"><span data-i18n="best">PERSONAL BEST</span> <span>↗</span></span><strong id="best">0000000</strong></div></section>
     <div class="energy"><div id="energyFill"></div><span id="energyLabel">NO FAIL</span><b id="energyText">100%</b></div>
     <section class="stage" id="stage" data-i18n-aria="stage" aria-label="Four note lanes. Tap when notes reach the glowing line.">
@@ -41,7 +41,7 @@
   <section class="start-screen" id="startScreen" aria-labelledby="startTitle">
     <button class="language-button start-language" data-language-toggle aria-label="切换到中文" lang="zh-CN">中文</button>
     <div class="start-body">
-      <img class="start-logo" src="vipermix-logo.webp?v=496b53aff8" alt="">
+      <img class="start-logo" src="vipermix-logo.webp?v=e48ec5e119" alt="">
       <h1 class="start-title" id="startTitle">VIPER<span>MIX</span></h1>
       <p class="start-tag"><span data-i18n="tapHold">TAP. HOLD.</span> <em data-i18n="flow">FLOW.</em></p>
       <button class="primary-button start-play" id="startButton"><span aria-hidden="true">▶</span><span data-i18n="play">PLAY</span></button>
@@ -53,6 +53,12 @@
     <h2><span data-i18n="turn">TURN</span><br><em data-i18n="sideways">SIDEWAYS.</em></h2>
     <button class="text-button" id="portraitButton" data-i18n="portrait">PLAY HERE ANYWAY</button>
   </section>
-  <script type="module" src="game.js?v=0c77277688"></script>
+  <link rel="modulepreload" href="engine.js?v=61f3a7b7e0">
+  <link rel="modulepreload" href="audio.js?v=d68ed20822">
+  <link rel="modulepreload" href="beat-analysis.js?v=5c36b5d508">
+  <link rel="modulepreload" href="song-import.js?v=89509aad09">
+  <link rel="modulepreload" href="song-library.js?v=8ebd178751">
+  <link rel="modulepreload" href="i18n.js?v=3701e9ba99">
+  <script type="module" src="game.js?v=e23be14866"></script>
 </body>
 </html>

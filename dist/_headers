@@ -1,0 +1,11 @@
+# Every file is linked with ?v=<its content hash>, so a changed file always
+# has a new address: keep files for a year. The page itself keeps the
+# default, checked on each visit, so it always points at the newest files.
+/*.js
+  Cache-Control: public, max-age=31536000, immutable
+/*.css
+  Cache-Control: public, max-age=31536000, immutable
+/*.png
+  Cache-Control: public, max-age=31536000, immutable
+/*.webp
+  Cache-Control: public, max-age=31536000, immutable

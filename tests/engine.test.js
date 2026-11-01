@@ -112,3 +112,13 @@ test('every cheer reads in English and Chinese, and the stage has a place for it
   for(const lang of ['en','zh'])for(const key of [...keys,'comboCount','perfectStreak'])assert.ok(messages[lang][key],lang+' '+key);
   assert.match(html,/id="cheer"/);
 });
+test('every ?v= tag matches its file, so year-long caching never serves an old file',async()=>{
+  const {createHash}=await import('node:crypto'),{readdirSync}=await import('node:fs');
+  const dist=new URL('../dist/',import.meta.url);let checked=0;
+  for(const name of readdirSync(dist).filter(n=>/\.(html|js|css)$/.test(n))){
+    for(const [,file,tag] of readFileSync(new URL(name,dist),'utf8').matchAll(/([\w.-]+\.(?:js|css|png|webp))\?v=([0-9a-f]+)/g)){
+      assert.equal(tag,createHash('sha1').update(readFileSync(new URL(file,dist))).digest('hex').slice(0,10),`${name} links an old ${file}; run npm run tags`);checked++;
+    }
+  }
+  assert.ok(checked>=15,'tags checked: '+checked);
+});

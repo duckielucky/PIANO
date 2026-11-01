@@ -6,7 +6,8 @@ import { listSongs, saveSong, deleteSong, MAX_SONGS } from './song-library.js?v=
 import { chooseLanguage, translate } from './i18n.js?v=3701e9ba99';
 
 const $ = s => document.querySelector(s);
-const canvas=$('#canvas'), ctx=canvas.getContext('2d'), stage=$('#stage'), modal=$('#modal');
+const canvas=$('#canvas'), stage=$('#stage'), modal=$('#modal');
+let ctx=canvas.getContext('2d');
 const audio = new Soundtrack();
 let savedLanguage;
 try { savedLanguage=localStorage.getItem('vipermix-language'); } catch {}
@@ -192,17 +193,57 @@ function setTrack(next){
   $('#best').textContent=format(readBest());
 }
 function setDifficulty(value){difficulty=value;$('#energyLabel').textContent=t(value==='easy'?'noFail':'energy');$('#difficultyLabel').textContent=t(value);document.querySelectorAll('[data-difficulty]').forEach(b=>{const active=b.dataset.difficulty===value;b.classList.toggle('selected',active);b.setAttribute('aria-pressed',String(active));});$('#best').textContent=format(readBest());}
-function resize(){const r=stage.getBoundingClientRect();width=r.width;height=r.height;dpr=Math.min(devicePixelRatio||1,2);canvas.width=Math.round(width*dpr);canvas.height=Math.round(height*dpr);ctx.setTransform(dpr,0,0,dpr,0,0);}
+function resize(){const r=stage.getBoundingClientRect();width=r.width;height=r.height;dpr=Math.min(devicePixelRatio||1,2);canvas.width=Math.round(width*dpr);canvas.height=Math.round(height*dpr);ctx.setTransform(dpr,0,0,dpr,0,0);scenery=null;}
 new ResizeObserver(resize).observe(stage);
 
 // Perspective projection adapts to the available landscape or fallback stage.
 function project(f,lane=.5){const p=Math.pow(Math.max(0,f),1.65), span=width*(.28+.66*p);return {x:width/2+(lane-.5)*span,y:height*(.025+.79*p),span,p};}
 function polygon(points,fill,stroke,line=1){ctx.beginPath();points.forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));ctx.closePath();if(fill){ctx.fillStyle=fill;ctx.fill();}if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=line;ctx.stroke();}}
 function line(a,b,color,size=1){ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.strokeStyle=color;ctx.lineWidth=size;ctx.stroke();}
+// Glows are blurred once into small sprites and stretched onto each note and
+// the hit line: a live canvas blur on every note each frame is slow on phones.
+// A sprite holds the halo of a 100-wide bar (20 tall for notes, 2 for lines)
+// blurred by 16 px; its 32 px margin stands for twice the blur radius.
+const glowSprites=new Map();
+function glowSprite(color,tall){
+  const key=color+tall;let c=glowSprites.get(key);
+  if(!c){
+    c=document.createElement('canvas');c.width=164;c.height=tall+64;const g=c.getContext('2d');
+    // Only the halo is wanted: the bar sits off the sprite and its shadow is cast onto it.
+    g.shadowColor=color;g.shadowBlur=16;g.shadowOffsetX=c.width;g.fillStyle=color;g.fillRect(32-c.width,32,100,tall);
+    glowSprites.set(key,c);
+  }
+  return c;
+}
+function glow(color,tall,x,y,w,h,blur){if(blur>.5)ctx.drawImage(glowSprite(color,tall),x-2*blur,y-2*blur,w+4*blur,h+4*blur);}
 function roundRect(x,y,w,h,r,fill,stroke){ctx.beginPath();ctx.roundRect(x,y,w,h,r);if(fill){ctx.fillStyle=fill;ctx.fill();}if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=1;ctx.stroke();}}
+// The parts of the stage that never move are painted once per screen size:
+// the backdrop, the road and its stripes, and the fog the notes appear from.
+let scenery=null;
+function paintLayer(draw){
+  const layer=document.createElement('canvas');layer.width=canvas.width;layer.height=canvas.height;
+  const screen=ctx;ctx=layer.getContext('2d');ctx.setTransform(dpr,0,0,dpr,0,0);draw();ctx=screen;
+  return layer;
+}
+function paintScenery(){
+  return {
+    back:paintLayer(()=>{
+      const ambience=ctx.createRadialGradient(width/2,height*.12,0,width/2,height*.3,width*.8);ambience.addColorStop(0,'#5d318666');ambience.addColorStop(.55,'#21113955');ambience.addColorStop(1,'#120a24');ctx.fillStyle=ambience;ctx.fillRect(0,0,width,height);
+    }),
+    road:paintLayer(()=>{
+      // Thin outer architecture adds depth without competing with the notes.
+      for(let i=0;i<5;i++){const a=project(0,-.2-i*.22),b=project(1.4,-.2-i*.22);line(a,b,'#7048a126');line({x:width-a.x,y:a.y},{x:width-b.x,y:b.y},'#7048a126');}
+      const surface=ctx.createLinearGradient(0,0,0,height);surface.addColorStop(0,'#180d2c');surface.addColorStop(.65,'#1b0f32');surface.addColorStop(1,'#231540');polygon([project(0,0),project(0,1),project(1.14,1),project(1.14,0)],surface);
+      for(let lane=0;lane<4;lane+=2)polygon([project(0,lane/4),project(0,(lane+1)/4),project(1.14,(lane+1)/4),project(1.14,lane/4)],'#ffffff02');
+    }),
+    fog:paintLayer(()=>{
+      const fog=ctx.createLinearGradient(0,0,0,height*.22);fog.addColorStop(0,'#120a24');fog.addColorStop(1,'#120a2400');ctx.fillStyle=fog;ctx.fillRect(0,0,width,height*.22);
+    }),
+  };
+}
 function highway(t){
-  ctx.clearRect(0,0,width,height);
-  const ambience=ctx.createRadialGradient(width/2,height*.12,0,width/2,height*.3,width*.8);ambience.addColorStop(0,'#5d318666');ambience.addColorStop(.55,'#21113955');ambience.addColorStop(1,'#120a24');ctx.fillStyle=ambience;ctx.fillRect(0,0,width,height);
+  scenery??=paintScenery();
+  ctx.clearRect(0,0,width,height);ctx.drawImage(scenery.back,0,0,width,height);
   if(!reducedMotion){
     for(let i=0;i<18;i++){
       const x=((i*71+Math.sin(visualTime*.25+i)*12)%width+width)%width;
@@ -211,11 +252,8 @@ function highway(t){
     }
     ctx.globalAlpha=1;
   }
-  // Thin outer architecture adds depth without competing with the notes.
-  for(let i=0;i<5;i++){const a=project(0,-.2-i*.22),b=project(1.4,-.2-i*.22);line(a,b,'#7048a126');line({x:width-a.x,y:a.y},{x:width-b.x,y:b.y},'#7048a126');}
-  const surface=ctx.createLinearGradient(0,0,0,height);surface.addColorStop(0,'#180d2c');surface.addColorStop(.65,'#1b0f32');surface.addColorStop(1,'#231540');polygon([project(0,0),project(0,1),project(1.14,1),project(1.14,0)],surface);
+  ctx.drawImage(scenery.road,0,0,width,height);
   for(let lane=0;lane<4;lane++){
-    if(lane%2===0)polygon([project(0,lane/4),project(0,(lane+1)/4),project(1.14,(lane+1)/4),project(1.14,lane/4)],'#ffffff02');
     if(flashes[lane]>0){const g=ctx.createLinearGradient(0,height*.35,0,height*.87);g.addColorStop(0,'#79b8ff00');g.addColorStop(1,`rgba(121,184,255,${flashes[lane]*.22})`);polygon([project(.1,lane/4),project(.1,(lane+1)/4),project(1.08,(lane+1)/4),project(1.08,lane/4)],g);}
   }
   const grid=run&&['playing','countdown','paused'].includes(mode)?beatGrid(track):null, now=grid?beatAt(grid,t):null;
@@ -239,7 +277,7 @@ function highway(t){
   if(now&&mode==='playing'&&now.k>=0){if(now.level===2&&lastLevel<2&&now.bar&&t>4)cheer('cheerDrop','',true);lastLevel=now.level;}
   const pulse=now&&!reducedMotion&&t>=0?Math.exp(-now.since*7)*(now.bar?1:.55)*[.55,.85,1.2][now.level]:0;
   for(let lane=0;lane<=4;lane++)line(project(0,lane/4),project(1.12,lane/4),lane===0||lane===4?`rgba(170,127,233,${.35+pulse*.5})`:'#8261ac30',lane===0||lane===4?1.4+pulse*1.2:1);
-  ctx.shadowColor='#91baff';ctx.shadowBlur=10+pulse*20;line(project(1,0),project(1,1),`rgba(172,154,255,${.6+pulse*.4})`,1.5+pulse*1.5);ctx.shadowBlur=0;
+  {const a=project(1,0),b=project(1,1),w=1.5+pulse*1.5;glow('#91baff',2,a.x,a.y-w/2,b.x-a.x,w,10+pulse*20);line(a,b,`rgba(172,154,255,${.6+pulse*.4})`,w);}
   if(pulse>.02&&now.level===2){
     // At the peak, stage lights at both sides answer each beat.
     for(const side of [0,1]){const x=side?width:0,glow=ctx.createRadialGradient(x,height*.55,0,x,height*.55,width*.42);glow.addColorStop(0,(now.k%2===side?'rgba(200,152,255,':'rgba(121,184,255,')+(pulse*.22)+')');glow.addColorStop(1,'rgba(18,10,36,0)');ctx.fillStyle=glow;ctx.fillRect(side?width*.5:0,0,width*.5,height);}
@@ -251,7 +289,7 @@ function highway(t){
     roundRect(a.x,a.y,bw,height*.075,7,g,active||flashes[lane]>.1?'#c4b7ff':'#79629a80');
     roundRect(a.x+10,a.y+3,bw-20,2,1,`rgba(121,184,255,${.27+pulse*.55})`);
   }
-  const fog=ctx.createLinearGradient(0,0,0,height*.22);fog.addColorStop(0,'#120a24');fog.addColorStop(1,'#120a2400');ctx.fillStyle=fog;ctx.fillRect(0,0,width,height*.22);
+  ctx.drawImage(scenery.fog,0,0,width,height);
 }
 function noteBlock(note,f,holding=false){
   if(f<0||f>1.16)return;
@@ -266,20 +304,22 @@ function noteBlock(note,f,holding=false){
       if(!reducedMotion){
         for(let i=0;i<3;i++){
           const phase=(visualTime*2+i/3)%1;
-          ctx.shadowColor=color;ctx.shadowBlur=8;
-          ctx.fillStyle='#f5eaff';ctx.fillRect(p.x-2,tail.y+(p.y-tail.y)*phase,4,4);
+          const y=tail.y+(p.y-tail.y)*phase;glow(color,20,p.x-2,y,4,4,4);
+          ctx.fillStyle='#f5eaff';ctx.fillRect(p.x-2,y,4,4);
         }
       }
-      ctx.shadowBlur=0;ctx.lineWidth=2.5;ctx.strokeStyle='#c898ff33';
+      ctx.lineWidth=2.5;ctx.strokeStyle='#c898ff33';
       ctx.beginPath();ctx.ellipse(p.x,p.y,nw*.64,nh*1.8,0,0,Math.PI*2);ctx.stroke();
-      ctx.strokeStyle='#e4c7ff';ctx.shadowColor=color;ctx.shadowBlur=reducedMotion?0:10;
-      ctx.beginPath();ctx.ellipse(p.x,p.y,nw*.64,nh*1.8,0,-Math.PI/2,-Math.PI/2+Math.PI*2*Math.max(.01,note.progress||0));ctx.stroke();ctx.shadowBlur=0;
+      // The progress ring: a soft wide stroke under a crisp one stands in for a glow.
+      const ring=()=>{ctx.beginPath();ctx.ellipse(p.x,p.y,nw*.64,nh*1.8,0,-Math.PI/2,-Math.PI/2+Math.PI*2*Math.max(.01,note.progress||0));ctx.stroke();};
+      if(!reducedMotion){ctx.strokeStyle='#c898ff40';ctx.lineWidth=8;ring();}
+      ctx.strokeStyle='#e4c7ff';ctx.lineWidth=2.5;ring();
     }
   }
-  ctx.shadowBlur=(mode==='menu'?10:16)*p.p;ctx.shadowColor=color;
+  glow(color,20,p.x-nw/2,p.y-nh/2,nw,nh,(mode==='menu'?10:16)*p.p);
   const face=ctx.createLinearGradient(0,p.y-nh,0,p.y+nh);face.addColorStop(0,isHold?'#eddaff':'#daedff');face.addColorStop(.25,color);face.addColorStop(.6,isHold?'#874ce1':'#3c6fcb');face.addColorStop(1,isHold?'#c898ff':'#94c7ff');
   polygon([{x:p.x-nw*.45,y:p.y-nh/2},{x:p.x+nw*.45,y:p.y-nh/2},{x:p.x+nw/2,y:p.y+nh/2},{x:p.x-nw/2,y:p.y+nh/2}],face,color);
-  ctx.shadowBlur=0;line({x:p.x-nw*.38,y:p.y-nh*.18},{x:p.x+nw*.38,y:p.y-nh*.18},'#ffffffa0',1);
+  line({x:p.x-nw*.38,y:p.y-nh*.18},{x:p.x+nw*.38,y:p.y-nh*.18},'#ffffffa0',1);
 
 }
 function burst(lane,color='#79b8ff'){
