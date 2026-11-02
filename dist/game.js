@@ -1,9 +1,9 @@
 import { TRACKS, makeChart, trackMap, gradeTiming, gradeAccuracy, Run, syncStep, SYNC_RANGE } from './engine.js?v=61f3a7b7e0';
-import { Soundtrack } from './audio.js?v=d68ed20822';
-import { makeAudioChart, beatMap, ANALYSIS_VERSION } from './beat-analysis.js?v=5c36b5d508';
-import { importSong } from './song-import.js?v=89509aad09';
+import { Soundtrack } from './audio.js?v=4f90acc887';
+import { makeAudioChart, beatMap, ANALYSIS_VERSION } from './beat-analysis.js?v=45599a3e48';
+import { importSong } from './song-import.js?v=52be8e49a5';
 import { listSongs, saveSong, deleteSong, MAX_SONGS } from './song-library.js?v=8ebd178751';
-import { chooseLanguage, translate } from './i18n.js?v=46a29ef48c';
+import { chooseLanguage, translate } from './i18n.js?v=3318dc24aa';
 
 const $ = s => document.querySelector(s);
 const canvas=$('#canvas'), stage=$('#stage'), modal=$('#modal');
@@ -96,7 +96,7 @@ function songMenuContent(){
 }
 function difficultyContent(){
   const notes=track.uploaded?makeAudioChart(track.analysis,difficulty):makeChart(track,difficulty);
-  return `<h2>${t('chooseDifficulty')}</h2><div class="selected-track"><span class="song-symbol" aria-hidden="true">♫</span><div><small>${t('selectedSong')}</small><strong>${escapeHtml(trackTitle(track))}</strong><span>${songFacts(track,duration())}</span></div></div><div class="difficulty-cards" role="group" aria-label="${t('difficulty')}">`+['easy','normal','hard'].map((value,i)=>`<button class="difficulty-card ${value===difficulty?'selected':''}" data-difficulty="${value}" aria-pressed="${value===difficulty}"><span class="difficulty-bars" aria-hidden="true">${[0,1,2].map(n=>`<i class="${n<=i?'lit':''}"></i>`).join('')}</span><strong>${t(value)}</strong><small>${t(value+'Hint')}</small></button>`).join('')+`</div><div class="setup-summary" role="status"><span>${t('noteCount',{count:notes.length})}</span><span>${t(difficulty==='easy'?'noFail':'tapHold')}</span></div><div class="setup-extras"><p class="setup-tune">${t('followsTune')}</p>${syncRow()}</div>${track.uploaded&&track.analysis.weakBeat?`<p class="setup-warning">${t('weakBeat')}</p>`:''}<button class="primary-button setup-start" data-action="start-game"><span aria-hidden="true">▶</span>${t('startGame')}</button>`;
+  return `<h2>${t('chooseDifficulty')}</h2><div class="selected-track"><span class="song-symbol" aria-hidden="true">♫</span><div><small>${t('selectedSong')}</small><strong>${escapeHtml(trackTitle(track))}</strong><span>${songFacts(track,duration())}</span></div></div><div class="difficulty-cards" role="group" aria-label="${t('difficulty')}">`+['easy','normal','hard'].map((value,i)=>`<button class="difficulty-card ${value===difficulty?'selected':''}" data-difficulty="${value}" aria-pressed="${value===difficulty}"><span class="difficulty-bars" aria-hidden="true">${[0,1,2].map(n=>`<i class="${n<=i?'lit':''}"></i>`).join('')}</span><strong>${t(value)}</strong><small>${t(value+'Hint')}</small></button>`).join('')+`</div><div class="setup-summary" role="status"><span>${t('noteCount',{count:notes.length})}</span><span>${t(difficulty==='easy'?'noFail':'tapHold')}</span></div><div class="setup-extras"><p class="setup-tune">${t('followsTune')}</p>${syncRow(true)}</div>${track.uploaded&&track.analysis.weakBeat?`<p class="setup-warning">${t('weakBeat')}</p>`:''}<button class="primary-button setup-start" data-action="start-game"><span aria-hidden="true">▶</span>${t('startGame')}</button>`;
 }
 $('#songFile').addEventListener('change',event=>loadSongs(event.target.files));
 modal.addEventListener('dragover',event=>{if(dialogType==='import'){event.preventDefault();modal.classList.add('file-dragover');}});
@@ -167,12 +167,14 @@ try{
   localStorage.removeItem('vipermix-sound-delay');
   audio.offset=clampSync(Number(localStorage.getItem('vipermix-audio-delay'))||0);
   tapDelay=clampSync(Number(localStorage.getItem('vipermix-tap-delay'))||0);
+  audio.hitSound=localStorage.getItem('vipermix-tap-sound')!=='0';
 }catch{}
 function setSync(value){audio.offset=clampSync(value);try{localStorage.setItem('vipermix-audio-delay',String(audio.offset));}catch{}}
 function setTapDelay(value){tapDelay=clampSync(value);try{localStorage.setItem('vipermix-tap-delay',String(tapDelay));}catch{}}
 const tapTime=()=>audio.time-tapDelay;
 const syncText=()=>t('soundDelayValue',{ms:Math.round(audio.offset*1000)});
-const syncRow=()=>`<div class="sync-row"><div><strong>${t('soundDelay')}</strong><small>${t('soundDelayHint')}</small></div><div class="sync-controls"><button class="sync-button" data-sync="-1" aria-label="${t('soundDelayLess')}">−</button><output role="status">${syncText()}</output><button class="sync-button" data-sync="1" aria-label="${t('soundDelayMore')}">+</button></div></div>`;
+const syncRow=(test=false)=>`<div class="sync-row"><div><strong>${t('soundDelay')}</strong><small>${t('soundDelayHint')}</small></div><div class="sync-controls"><button class="sync-button" data-sync="-1" aria-label="${t('soundDelayLess')}">−</button><output role="status">${syncText()}</output><button class="sync-button" data-sync="1" aria-label="${t('soundDelayMore')}">+</button>${test?`<button class="sync-test" data-action="sync-test">${t('syncTest')}</button>`:''}</div></div>`;
+const tapSoundRow=()=>`<div class="sync-row"><div><strong>${t('tapSound')}</strong></div><button class="sync-toggle" data-action="tap-sound" aria-pressed="${audio.hitSound}">${t(audio.hitSound?'tapSoundOn':'tapSoundOff')}</button></div>`;
 let syncSamples=[],sinceSync=0;
 // A tap near a note, scored or not, tells how late this player's taps land.
 function learnSync(lane,t){
@@ -184,6 +186,44 @@ function learnSync(lane,t){
   const before=tapDelay;setTapDelay(before+step);const moved=tapDelay-before;
   syncSamples=syncSamples.map(e=>e-moved);sinceSync=0;
 }
+// The sync test: clicks play on a steady beat while notes fall to a line. The
+// player taps along, which sets the tap delay, and moves the sound delay
+// until the notes land on the line as each click is heard.
+const SYNC_BEAT=.6;let syncTaps=[],syncFlash=0;
+function syncTapText(){
+  if(syncTaps.length<6)return syncTaps.length?t('syncTapsMore',{count:6-syncTaps.length}):t('syncTapPrompt');
+  const ms=Math.round(tapDelay*1000);
+  return Math.abs(ms)<10?t('syncTapsOn'):t(ms>0?'syncTapsLate':'syncTapsEarly',{ms:Math.abs(ms)});
+}
+async function openSyncTest(){
+  syncTaps=[];showDialog('sync');
+  try{await audio.unlock();}catch{return;}
+  if(dialogType==='sync'&&modal.open)audio.startClicks(SYNC_BEAT);
+}
+function syncTap(){
+  if(!audio.clicking)return;
+  const heard=audio.time,error=heard-Math.round(heard/SYNC_BEAT)*SYNC_BEAT;syncFlash=1;audio.hit();
+  if(heard<-.2||Math.abs(error)>.25)return;
+  syncTaps.push(error);if(syncTaps.length>12)syncTaps.shift();
+  if(syncTaps.length>=6){const sorted=[...syncTaps].sort((a,b)=>a-b);setTapDelay((sorted[(sorted.length-1)>>1]+sorted[sorted.length>>1])/2);}
+  const out=$('#modalContent .sync-taps');if(out)out.textContent=syncTapText();
+}
+function drawSyncTest(){
+  const c=$('#modalContent .sync-canvas');if(!c)return;
+  const w=c.clientWidth,h=c.clientHeight;if(!w||!h)return;
+  if(c.width!==Math.round(w*dpr)||c.height!==Math.round(h*dpr)){c.width=Math.round(w*dpr);c.height=Math.round(h*dpr);}
+  const g=c.getContext('2d');g.setTransform(dpr,0,0,dpr,0,0);g.clearRect(0,0,w,h);
+  const line=h*.78,fall=1.2,now=audio.clicking?audio.time:-9,nw=Math.min(90,w*.3);
+  const near=audio.clicking?Math.abs(now-Math.round(now/SYNC_BEAT)*SYNC_BEAT):1,beam=Math.max(syncFlash,near<.05&&now>-.05?1-near/.05:0);
+  g.fillStyle=`rgba(200,152,255,${.08+beam*.25})`;g.fillRect(w/2-nw/2-8,0,nw+16,h);
+  g.fillStyle=`rgba(172,154,255,${.55+beam*.45})`;g.fillRect(12,line-1,w-24,2+beam*2);
+  for(let k=Math.max(0,Math.ceil((now-.25)/SYNC_BEAT));k*SYNC_BEAT<now+fall;k++){
+    const y=line-(k*SYNC_BEAT-now)/fall*line;g.globalAlpha=y>line?Math.max(0,1-(y-line)/(h-line)):1;
+    g.fillStyle=k%4?'#79b8ff':'#c898ff';g.beginPath();g.roundRect(w/2-nw/2,y-6,nw,12,4);g.fill();
+  }
+  g.globalAlpha=1;syncFlash=Math.max(0,syncFlash-.08);
+}
+$('#modalContent').addEventListener('pointerdown',e=>{if(e.target.classList.contains('sync-canvas')){e.preventDefault();syncTap();}});
 function readBest(){try{return Number(localStorage.getItem(bestKey()))||0;}catch{return 0;}}
 function saveBest(score){try{localStorage.setItem(bestKey(),String(score));}catch{}}
 const format=n=>Math.round(n).toString().padStart(7,'0');
@@ -197,7 +237,9 @@ function resize(){const r=stage.getBoundingClientRect();width=r.width;height=r.h
 new ResizeObserver(resize).observe(stage);
 
 // Perspective projection adapts to the available landscape or fallback stage.
-function project(f,lane=.5){const p=Math.pow(Math.max(0,f),1.65), span=width*(.28+.66*p);return {x:width/2+(lane-.5)*span,y:height*(.025+.79*p),span,p};}
+// Notes keep a nearly even pace down the road: one that speeds up near the line
+// arrives sooner than the eye expects and feels off the beat.
+function project(f,lane=.5){const p=Math.pow(Math.max(0,f),1.15), span=width*(.28+.66*p);return {x:width/2+(lane-.5)*span,y:height*(.025+.79*p),span,p};}
 function polygon(points,fill,stroke,line=1){ctx.beginPath();points.forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));ctx.closePath();if(fill){ctx.fillStyle=fill;ctx.fill();}if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=line;ctx.stroke();}}
 function line(a,b,color,size=1){ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.strokeStyle=color;ctx.lineWidth=size;ctx.stroke();}
 // Glows are blurred once into small sprites and stretched onto each note and
@@ -344,13 +386,15 @@ function burst(lane,color='#79b8ff',perfect=false){
 }
 // A missed note flashes its lane red.
 function missed(lane){missFlashes[lane]=1;}
-function announce(result,lane){
+function announce(result,lane,error=0){
   const el=$('#judgment');el.dataset.result=result;el.textContent=t(result);
+  // Off the beat, a small word says which way, so the player knows how to fix it.
+  if((result==='great'||result==='good')&&Math.abs(error)>.03){const side=document.createElement('small');side.textContent=t(error<0?'early':'late');el.append(side);}
   el.style.color=({perfect:'#c898ff',great:'#79b8ff',good:'#b6a1ff',miss:'#ff7b9f'})[result];
   el.classList.remove('show');void el.offsetWidth;el.classList.add('show');
   if(result!=='miss')burst(lane,result==='perfect'?'#c898ff':'#79b8ff',result==='perfect');else missed(lane);
 }
-function judge(note,result,error){if(run.judge(note,result,error)){announce(result,note.lane);encourage(result);}updateHUD();}
+function judge(note,result,error){if(run.judge(note,result,error)){announce(result,note.lane,error);encourage(result);}updateHUD();}
 // Cheers: a word of encouragement in the middle of the stage at combo
 // milestones, long Perfect streaks, the song's drop, a comeback from low
 // energy, and after a rough patch. One at a time: a milestone cuts in over a
@@ -392,7 +436,7 @@ function showError(){showDialog('error');}
 function isLaneDown(lane){return keys.has(lane)||[...pointers.values()].some(p=>p.lane===lane);}
 function press(lane){
   if(mode!=='playing')return;
-  flashes[lane]=Math.max(flashes[lane],.7);flashColor[lane]=RGB['#79b8ff'];const t=tapTime();learnSync(lane,t);const n=run.candidate(lane,t);if(!n)return;
+  flashes[lane]=Math.max(flashes[lane],.7);flashColor[lane]=RGB['#79b8ff'];audio.hit();const t=tapTime();learnSync(lane,t);const n=run.candidate(lane,t);if(!n)return;
   const rating=gradeTiming(t-n.time,run.windows);
   if(n.type==='hold'){n.status='holding';n.holdGrade=rating;n.error=t-n.time;burst(lane,'#c898ff');}
   else judge(n,rating,t-n.time);
@@ -418,6 +462,7 @@ const keyLanes={KeyD:0,KeyF:1,KeyJ:2,KeyK:3};
 window.addEventListener('keydown',e=>{
   if(e.code==='Escape'){e.preventDefault();if(mode==='playing'||mode==='countdown')pause();else if(mode==='paused')resume();else if(modal.open)backDialog();return;}
   if(e.code==='Space'&&!modal.open&&!e.target.closest('button,a,input,select')){e.preventDefault();if(mode==='menu')trackMenu();return;}
+  if(dialogType==='sync'&&modal.open&&(e.code in keyLanes||e.code==='Space')){e.preventDefault();if(!e.repeat)syncTap();return;}
   if(e.code in keyLanes){e.preventDefault();if(e.repeat)return;const l=keyLanes[e.code];keys.add(l);press(l);}
 
 });
@@ -445,10 +490,11 @@ function finish(reason='complete'){
   lastResult={reason,newBest,accuracy,grade};showDialog('results');
 }
 function closeModal(){
+  audio.stopClicks();
   if(dialogType==='import'&&importController){importController.abort();importController=null;uploadState={status:'idle',fileName:'',progress:null};}
   if(modal.open)modal.close();dialogType='';modal.classList.remove('file-dragover');
 }
-function showDialog(type){dialogType=type;renderDialog();if(!modal.open)modal.showModal();}
+function showDialog(type){if(type!=='sync')audio.stopClicks();dialogType=type;renderDialog();if(!modal.open)modal.showModal();}
 function help(){showDialog('help');}
 function trackMenu(){if(mode==='menu')showDialog('tracks');}
 // The song list is home: leaving a game lands there, and leaving the song
@@ -462,7 +508,8 @@ function dismiss(){
   else trackMenu();
 }
 function backDialog(){
-  if(dialogType==='difficulty'||dialogType==='import')backToSongs();
+  if(dialogType==='sync')showDialog('difficulty');
+  else if(dialogType==='difficulty'||dialogType==='import')backToSongs();
   else if(dialogType==='results')goHome();
   else dismiss();
 }
@@ -471,10 +518,11 @@ function renderDialog(){
   let content='';
   if(dialogType==='import')content=importContent();
   if(dialogType==='error')content=`<div class="eyebrow">${t('retry')}</div><h2>${t('oneMoreBeat')}</h2><p>${t('audioError')}</p><button class="primary-button" data-action="close">${t('gotIt')}</button>`;
-  if(dialogType==='pause')content=`<h2><em>${t('paused')}</em></h2>${syncRow()}<button class="primary-button" data-action="resume">${t('resume')} <span>▶</span></button><button class="secondary-button" data-action="restart">${t('restart')}</button><button class="secondary-button" data-action="home">${t('changeSong')}</button>`;
+  if(dialogType==='pause')content=`<h2><em>${t('paused')}</em></h2>${syncRow()}${tapSoundRow()}<button class="primary-button" data-action="resume">${t('resume')} <span>▶</span></button><button class="secondary-button" data-action="restart">${t('restart')}</button><button class="secondary-button" data-action="home">${t('changeSong')}</button>`;
   if(dialogType==='help')content=`<h2>${t('tap')} <em>+ ${t('hold')}</em></h2><div class="tutorial-row"><div class="note-demo"><span class="note-icon tap"></span></div><div><strong>${t('tap')}</strong><p>${t('tapHelp')}</p></div></div><div class="tutorial-row"><div class="note-demo"><span class="note-icon hold"></span></div><div><strong>${t('hold')}</strong><p>${t('holdHelp')}</p></div></div><p class="key-hint">${t('keyboardHelp')}</p><button class="primary-button" data-action="close">${t('gotIt')}</button>`;
   if(dialogType==='tracks')content=songMenuContent();
   if(dialogType==='difficulty')content=difficultyContent();
+  if(dialogType==='sync')content=`<h2>${t('syncTitle')}</h2><p class="sync-intro">${t('syncIntro')}</p><canvas class="sync-canvas" role="button" aria-label="${t('syncCanvas')}"></canvas><output class="sync-taps" role="status">${syncTapText()}</output>${syncRow()}<button class="primary-button" data-action="sync-done">${t('done')}</button>`;
   if(dialogType==='results'&&lastResult){
     const {reason,newBest,accuracy,grade}=lastResult;
     content=`<div class="eyebrow">${t(reason==='complete'?'complete':'outOfEnergy')}</div><h2>${t(reason==='complete'?'niceFlow':'tryAgain')}</h2><div class="result-grade">${grade}</div><div class="result-score">${format(run.score)}</div><div class="result-best">${newBest?'↗ '+t('newBest'):escapeHtml(trackTitle(track))}</div><div class="result-stats"><div><strong>${accuracy.toFixed(1)}%</strong><span>${t('accuracy')}</span></div><div><strong>${run.maxCombo}</strong><span>${t('maxCombo')}</span></div></div><div class="result-breakdown"><span>${run.counts.perfect} ${t('perfect')}</span><span>${run.counts.great+run.counts.good} ${t('goodGreat')}</span><span>${run.counts.miss} ${t('miss')}</span></div><button class="primary-button" data-action="restart">${t('playAgain')} <span>↗</span></button><button class="secondary-button" data-action="back-songs">${t('changeTrackAction')}</button>`;
@@ -489,6 +537,8 @@ $('#modalContent').addEventListener('click',e=>{
   if(action==='choose-file')chooseFile();
   if(action==='start-game'&&dialogType==='difficulty')start();
   if(action==='back-songs')backToSongs();
+  if(action==='sync-test')openSyncTest();if(action==='sync-done')showDialog('difficulty');
+  if(action==='tap-sound'){audio.hitSound=!audio.hitSound;try{localStorage.setItem('vipermix-tap-sound',audio.hitSound?'1':'0');}catch{}renderDialog();$('[data-action="tap-sound"]')?.focus();return;}
   if(action==='close')dismiss();if(action==='resume')resume();if(action==='restart')start();if(action==='home')goHome();
   const remove=e.target.closest('[data-remove]')?.dataset.remove;
   if(remove){if(removing===remove){removing='';removeMySong(remove);}else removing=remove;renderDialog();$(`[data-remove="${remove}"]`)?.focus();return;}
@@ -561,6 +611,7 @@ function frame(now){
     else{ctx.fillStyle=p.color;ctx.fillRect(p.x,p.y,p.size||2,p.size||2);}
   }
   ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';
+  if(dialogType==='sync'&&modal.open)drawSyncTest();
   requestAnimationFrame(frame);
 }
 applyLanguage();syncOrientation();resize();requestAnimationFrame(frame);

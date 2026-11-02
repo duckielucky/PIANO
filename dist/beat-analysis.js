@@ -274,6 +274,15 @@ export function pitchAt(melody,time){
   heard.sort((a,b)=>a-b);const middle=heard[heard.length>>1];
   return heard.filter(v=>Math.abs(v-middle)<=3).length>=3?middle/4:null;
 }
+// Where pitchAt finds no clear note (a drum hit, a breath), the tune a little
+// either side still says roughly where the melody is; lanes use that.
+function tuneAround(melody,time){
+  const heard=[];
+  for(let i=Math.max(0,Math.ceil((time-.12)/MELODY_STEP));i<=Math.floor((time+.5)/MELODY_STEP)&&i<melody.length;i++)if(melody[i])heard.push(melody[i]);
+  if(heard.length<2)return null;
+  heard.sort((a,b)=>a-b);const middle=heard[heard.length>>1];
+  return heard.filter(v=>Math.abs(v-middle)<=3).length>=2?middle/4:null;
+}
 const NOTE_NAMES=['C','C#','D','Eb','E','F','F#','G','Ab','A','Bb','B'];
 // Temperley's key profiles: how strongly each step of the scale belongs to a major or a minor key.
 const PROFILE={major:[5,2,3.5,2,4.5,4,2,4.5,2,3.5,1.5,4],minor:[5,2,3.5,4.5,2,4,2,4.5,3.5,2,1.5,4]};
@@ -392,41 +401,66 @@ export function makeAudioChart(analysis,difficulty='easy'){
     note.hold=!note.chord&&room>=1.5*beat&&(note.event.sustain??0)>=.75*beat&&(note.level===0?note.bar===0||sinceHold>=2:sinceHold>=4)&&length>=Math.max(.3,.6*beat);
     note.length=note.hold?length:0;sinceHold=note.hold?0:sinceHold+1;
   });
-  // Lanes follow the tune like keys on a piano: a higher note sits further
-  // right, a lower one further left, and a repeated note stays where it is.
-  // Each note is placed within the range the melody covers around it, then
-  // nudged so a step up always moves right and a step down always moves left.
-  // Notes with no clear pitch (drums) walk on in the tune's last direction.
-  const tune=picked.map(({event})=>event.pitch??(analysis.melody?pitchAt(analysis.melody,event.time):null));
-  const placed=i=>{
-    const around=[];for(let j=Math.max(0,i-8);j<=Math.min(tune.length-1,i+8);j++)if(tune[j]!==null)around.push(tune[j]);
-    around.sort((a,b)=>a-b);
-    let lo=around[Math.floor(around.length*.1)],hi=around[Math.floor((around.length-1)*.9)];
-    if(hi-lo<5){const mid=(lo+hi)/2;lo=mid-2.5;hi=mid+2.5;}
-    return Math.max(0,Math.min(3,Math.round((tune[i]-lo)/(hi-lo)*3)));
+  // Lanes follow the tune like keys on a piano: a step up moves right, a step
+  // down moves left, a repeated note stays where it is. Each bar is laid out
+  // from its own notes, so music that comes back plays the same way again:
+  // the bar's moves are worked out first, then the whole shape slides along
+  // the keys to sit where the bar's pitch sits in the song, carrying on from
+  // the bar before when the tune steps across. A bar that spans more than
+  // four keys takes its leaps one key at a time, or failing that is laid out
+  // in halves. Notes with no clear pitch
+  // (drums) walk on in the tune's last direction; a note repeated too fast
+  // for one finger alternates with the key beside it, and one sung over and
+  // over moves along in pairs. A bar with the same
+  // rhythm and the same notes as one before it copies that bar's lanes.
+  const tune=picked.map(({event})=>event.pitch??(analysis.melody?pitchAt(analysis.melody,event.time)??tuneAround(analysis.melody,event.time):null));
+  const known=tune.filter(p=>p!==null).sort((a,b)=>a-b), low=known[Math.floor(known.length*.1)]??60, high=Math.max(low+5,known[Math.floor(known.length*.9)]??65);
+  const moveBetween=(j,i,last)=>{
+    const a=tune[j],b=tune[i],apart=picked[i].event.time-picked[j].event.time;
+    if(a===null||b===null)return last||1;
+    const step=b-a;
+    if(Math.abs(step)<.75)return apart<.2?(last>0?-1:1):0;
+    return Math.sign(step)*(Math.abs(step)>=4.5&&apart>=.3?2:1);
   };
-  const free=[-9,-9,-9,-9], notes=[];let lane=1,last=[],dir=1,sung=null;
+  const lanes=new Array(picked.length),used=[0,0,0,0];
+  // How much more than its share each lane has had so far, so new bars lean toward the quieter keys.
+  const crowding=keys=>{const total=used[0]+used[1]+used[2]+used[3];return total?keys.reduce((sum,l)=>sum+used[l]/total-.25,0)/keys.length*4:0;};
+  // A note sung over and over is played twice on a key, then twice on the key beside it.
+  const outline=(items,most)=>{const shape=[0];let last=0,held=false;for(let q=1;q<items.length;q++){let m=Math.max(-most,Math.min(most,moveBetween(items[q-1],items[q],last)));if(m===0&&held){m=last>0?-1:1;held=false;}else held=m===0;if(m)last=m;shape.push(shape[q-1]+m);}return shape;};
+  const layOut=(items,before)=>{
+    let shape=outline(items,2);if(Math.max(...shape)-Math.min(...shape)>3)shape=outline(items,1);
+    const lo=Math.min(...shape),hi=Math.max(...shape);
+    if(hi-lo>3){const half=items.length>>1;layOut(items.slice(0,half),before);layOut(items.slice(half),items[half-1]);return;}
+    const sung=items.map(i=>tune[i]).filter(p=>p!==null), centre=sung.length?(sung.reduce((a,b)=>a+b,0)/sung.length-low)/(high-low)*3:1.5;
+    const into=before===undefined||tune[before]===null||tune[items[0]]===null?null:lanes[before]+moveBetween(before,items[0],0)-shape[0];
+    let best=null,bestScore=Infinity;
+    for(let o=-lo;o<=3-hi;o++){const score=Math.abs(o+(lo+hi)/2-centre)+(into===null?0:2*Math.abs(o-into))+4*crowding(shape.map(x=>o+x));if(score<bestScore-1e-9){best=o;bestScore=score;}}
+    items.forEach((i,q)=>{lanes[i]=best+shape[q];used[lanes[i]]++;});
+  };
+  const bars=[];picked.forEach((note,i)=>{const b=Math.floor((note.k-downbeat)/4);if(bars.at(-1)?.bar!==b)bars.push({bar:b,items:[]});bars.at(-1).items.push(i);});
+  // The earlier bar's lanes must still rise and fall with this bar's own tune.
+  const sameMusic=(a,b)=>{
+    if(a.rhythm!==b.rhythm)return false;let both=0,same=0,steps=0,along=0;
+    a.items.forEach((i,q)=>{const x=tune[i],y=tune[b.items[q]];if(x!==null&&y!==null){both++;if(Math.abs(x-y)<1)same++;}});
+    for(let q=1;q<a.items.length;q++){const x=tune[a.items[q-1]],y=tune[a.items[q]];if(x===null||y===null||Math.abs(y-x)<.75)continue;steps++;if(Math.sign(lanes[b.items[q]]-lanes[b.items[q-1]])===Math.sign(y-x))along++;}
+    return same>=both*.6&&along>=steps*.85;
+  };
+  bars.forEach((group,g)=>{
+    const start=beats[downbeat+4*group.bar]??picked[group.items[0]].event.time;
+    group.rhythm=group.items.map(i=>Math.round((picked[i].event.time-start)/beat*4)).join();
+    const earlier=bars.slice(0,g).reverse().find(other=>sameMusic(group,other));
+    if(earlier)group.items.forEach((i,q)=>{lanes[i]=lanes[earlier.items[q]];used[lanes[i]]++;});
+    else layOut(group.items,g?bars[g-1].items.at(-1):undefined);
+  });
+  // A lane still busy (just played, or held) hands the note to the nearest open lane.
+  const free=[-9,-9,-9,-9], notes=[];
   picked.forEach(({event,chord,hold,length},i)=>{
-    const time=event.time, open=l=>l>=0&&l<4&&time-free[l]>=.18, pitch=tune[i];
-    let pick;
-    if(pitch===null){
-      pick=lane+dir;if(pick<0||pick>3){dir=-dir;pick=lane+dir;}
-    }else{
-      pick=placed(i);
-      if(sung!==null){
-        const step=pitch-sung;
-        if(Math.abs(step)<.5)pick=lane;
-        else if(step>0)pick=Math.max(pick,Math.min(3,lane+(step>=5?2:1)));
-        else pick=Math.min(pick,Math.max(0,lane-(step<=-5?2:1)));
-      }
-    }
-    // A lane still busy (just played, or held) hands the note to the nearest open lane, on the side the tune is heading.
-    if(!open(pick)){const toward=pick===lane?dir:Math.sign(pick-lane);pick=[0,1,2,3].filter(open).sort((a,b)=>Math.abs(a-pick)-Math.abs(b-pick)||Math.sign(b-pick)*toward-Math.sign(a-pick)*toward)[0]??pick;}
+    const time=event.time, open=l=>time-free[l]>=.18, want=lanes[i];
+    const pick=open(want)?want:[0,1,2,3].filter(open).sort((a,b)=>Math.abs(a-want)-Math.abs(b-want)||Math.abs(a-1.5)-Math.abs(b-1.5))[0]??want;
     const add=l=>{notes.push({lane:l,time,type:hold?'hold':'tap',duration:hold?length:0,status:'pending'});free[l]=time+(hold?length:0);};
     add(pick);
-    if(chord){const second=[0,1,2,3].filter(l=>l!==pick&&!last.includes(l)&&time-free[l]>=.18).sort((a,b)=>Math.abs(b-pick)-Math.abs(a-pick))[0];last=[pick];if(second!==undefined){add(second);last.push(second);}}else last=[pick];
-    if(pick!==lane)dir=pick>lane?1:-1;
-    lane=pick;sung=pitch;
+    // A big hit adds the key two along, like a chord under the hand.
+    if(chord){const second=[pick<2?pick+2:pick-2,pick<2?pick+3:pick-3,pick<2?pick+1:pick-1].find(l=>l>=0&&l<4&&open(l));if(second!==undefined)add(second);}
   });
   return notes.sort((a,b)=>a.time-b.time||a.lane-b.lane).map((note,id)=>({id,...note}));
 }

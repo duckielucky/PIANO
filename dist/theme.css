@@ -233,3 +233,15 @@ body.portrait-fallback:not([data-state="menu"]) .track-footer{display:none}
 body.portrait-fallback:not([data-state="menu"]) .scoreboard{padding-top:8px;padding-bottom:8px}
 body.portrait-fallback:not([data-state="menu"]) #score{font-size:22px}
 body.portrait-fallback:not([data-state="menu"]) .energy{margin-bottom:12px}
+
+/* Early / late under GREAT and GOOD. */
+.judgment small{display:block;margin-top:2px;font-size:11px;letter-spacing:3px;opacity:.85}
+/* Sync test and the tap sound switch. */
+.sync-test,.sync-toggle{min-width:44px;height:30px;padding:0 10px;border-radius:8px;border:1px solid rgba(190,160,255,.35);background:rgba(170,140,255,.18);color:#f2eaff;font:inherit;font-size:10px;font-weight:700;letter-spacing:.08em;cursor:pointer;touch-action:manipulation}
+.sync-toggle[aria-pressed="false"]{background:transparent;color:#a996c1}
+dialog[data-dialog="pause"] .sync-row+.sync-row{margin-top:-4px}
+.sync-intro{margin:6px 0 10px;color:#b9a8d3;font-size:12px;line-height:1.55}
+.sync-canvas{display:block;width:100%;height:160px;border-radius:12px;border:1px solid rgba(190,160,255,.18);background:#0f0820;cursor:pointer;touch-action:none}
+.sync-taps{display:block;min-height:18px;margin:8px 0 2px;color:#e9defa;font-size:12px;text-align:center}
+dialog[data-dialog="sync"] .sync-row{margin-bottom:12px}
+@media(orientation:landscape) and (max-height:540px){.sync-canvas{height:96px}.sync-intro{margin:2px 0 6px;font-size:11px}}
