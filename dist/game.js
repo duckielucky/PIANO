@@ -1,9 +1,9 @@
 import { TRACKS, makeChart, trackMap, gradeTiming, gradeAccuracy, Run, syncStep, SYNC_RANGE } from './engine.js?v=61f3a7b7e0';
-import { Soundtrack } from './audio.js?v=4f90acc887';
+import { Soundtrack } from './audio.js?v=0de730cf2c';
 import { makeAudioChart, beatMap, ANALYSIS_VERSION } from './beat-analysis.js?v=45599a3e48';
 import { importSong } from './song-import.js?v=52be8e49a5';
 import { listSongs, saveSong, deleteSong, MAX_SONGS } from './song-library.js?v=8ebd178751';
-import { chooseLanguage, translate } from './i18n.js?v=3318dc24aa';
+import { chooseLanguage, translate } from './i18n.js?v=9d99bcf74e';
 
 const $ = s => document.querySelector(s);
 const canvas=$('#canvas'), stage=$('#stage'), modal=$('#modal');
@@ -167,14 +167,12 @@ try{
   localStorage.removeItem('vipermix-sound-delay');
   audio.offset=clampSync(Number(localStorage.getItem('vipermix-audio-delay'))||0);
   tapDelay=clampSync(Number(localStorage.getItem('vipermix-tap-delay'))||0);
-  audio.hitSound=localStorage.getItem('vipermix-tap-sound')!=='0';
 }catch{}
 function setSync(value){audio.offset=clampSync(value);try{localStorage.setItem('vipermix-audio-delay',String(audio.offset));}catch{}}
 function setTapDelay(value){tapDelay=clampSync(value);try{localStorage.setItem('vipermix-tap-delay',String(tapDelay));}catch{}}
 const tapTime=()=>audio.time-tapDelay;
 const syncText=()=>t('soundDelayValue',{ms:Math.round(audio.offset*1000)});
 const syncRow=(test=false)=>`<div class="sync-row"><div><strong>${t('soundDelay')}</strong><small>${t('soundDelayHint')}</small></div><div class="sync-controls"><button class="sync-button" data-sync="-1" aria-label="${t('soundDelayLess')}">−</button><output role="status">${syncText()}</output><button class="sync-button" data-sync="1" aria-label="${t('soundDelayMore')}">+</button>${test?`<button class="sync-test" data-action="sync-test">${t('syncTest')}</button>`:''}</div></div>`;
-const tapSoundRow=()=>`<div class="sync-row"><div><strong>${t('tapSound')}</strong></div><button class="sync-toggle" data-action="tap-sound" aria-pressed="${audio.hitSound}">${t(audio.hitSound?'tapSoundOn':'tapSoundOff')}</button></div>`;
 let syncSamples=[],sinceSync=0;
 // A tap near a note, scored or not, tells how late this player's taps land.
 function learnSync(lane,t){
@@ -202,7 +200,7 @@ async function openSyncTest(){
 }
 function syncTap(){
   if(!audio.clicking)return;
-  const heard=audio.time,error=heard-Math.round(heard/SYNC_BEAT)*SYNC_BEAT;syncFlash=1;audio.hit();
+  const heard=audio.time,error=heard-Math.round(heard/SYNC_BEAT)*SYNC_BEAT;syncFlash=1;
   if(heard<-.2||Math.abs(error)>.25)return;
   syncTaps.push(error);if(syncTaps.length>12)syncTaps.shift();
   if(syncTaps.length>=6){const sorted=[...syncTaps].sort((a,b)=>a-b);setTapDelay((sorted[(sorted.length-1)>>1]+sorted[sorted.length>>1])/2);}
@@ -436,7 +434,7 @@ function showError(){showDialog('error');}
 function isLaneDown(lane){return keys.has(lane)||[...pointers.values()].some(p=>p.lane===lane);}
 function press(lane){
   if(mode!=='playing')return;
-  flashes[lane]=Math.max(flashes[lane],.7);flashColor[lane]=RGB['#79b8ff'];audio.hit();const t=tapTime();learnSync(lane,t);const n=run.candidate(lane,t);if(!n)return;
+  flashes[lane]=Math.max(flashes[lane],.7);flashColor[lane]=RGB['#79b8ff'];const t=tapTime();learnSync(lane,t);const n=run.candidate(lane,t);if(!n)return;
   const rating=gradeTiming(t-n.time,run.windows);
   if(n.type==='hold'){n.status='holding';n.holdGrade=rating;n.error=t-n.time;burst(lane,'#c898ff');}
   else judge(n,rating,t-n.time);
@@ -518,7 +516,7 @@ function renderDialog(){
   let content='';
   if(dialogType==='import')content=importContent();
   if(dialogType==='error')content=`<div class="eyebrow">${t('retry')}</div><h2>${t('oneMoreBeat')}</h2><p>${t('audioError')}</p><button class="primary-button" data-action="close">${t('gotIt')}</button>`;
-  if(dialogType==='pause')content=`<h2><em>${t('paused')}</em></h2>${syncRow()}${tapSoundRow()}<button class="primary-button" data-action="resume">${t('resume')} <span>▶</span></button><button class="secondary-button" data-action="restart">${t('restart')}</button><button class="secondary-button" data-action="home">${t('changeSong')}</button>`;
+  if(dialogType==='pause')content=`<h2><em>${t('paused')}</em></h2>${syncRow()}<button class="primary-button" data-action="resume">${t('resume')} <span>▶</span></button><button class="secondary-button" data-action="restart">${t('restart')}</button><button class="secondary-button" data-action="home">${t('changeSong')}</button>`;
   if(dialogType==='help')content=`<h2>${t('tap')} <em>+ ${t('hold')}</em></h2><div class="tutorial-row"><div class="note-demo"><span class="note-icon tap"></span></div><div><strong>${t('tap')}</strong><p>${t('tapHelp')}</p></div></div><div class="tutorial-row"><div class="note-demo"><span class="note-icon hold"></span></div><div><strong>${t('hold')}</strong><p>${t('holdHelp')}</p></div></div><p class="key-hint">${t('keyboardHelp')}</p><button class="primary-button" data-action="close">${t('gotIt')}</button>`;
   if(dialogType==='tracks')content=songMenuContent();
   if(dialogType==='difficulty')content=difficultyContent();
@@ -538,7 +536,6 @@ $('#modalContent').addEventListener('click',e=>{
   if(action==='start-game'&&dialogType==='difficulty')start();
   if(action==='back-songs')backToSongs();
   if(action==='sync-test')openSyncTest();if(action==='sync-done')showDialog('difficulty');
-  if(action==='tap-sound'){audio.hitSound=!audio.hitSound;try{localStorage.setItem('vipermix-tap-sound',audio.hitSound?'1':'0');}catch{}renderDialog();$('[data-action="tap-sound"]')?.focus();return;}
   if(action==='close')dismiss();if(action==='resume')resume();if(action==='restart')start();if(action==='home')goHome();
   const remove=e.target.closest('[data-remove]')?.dataset.remove;
   if(remove){if(removing===remove){removing='';removeMySong(remove);}else removing=remove;renderDialog();$(`[data-remove="${remove}"]`)?.focus();return;}

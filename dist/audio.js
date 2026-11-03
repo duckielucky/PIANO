@@ -1,6 +1,6 @@
 // Original procedural soundtrack. All playback and note timing share this audio clock.
 export class Soundtrack {
-  constructor() { this.ctx = null; this.nodes = new Set(); this.muted = false; this.timer = null; this.offset = 0; this.hitSound = true; this.clicking = false; }
+  constructor() { this.ctx = null; this.nodes = new Set(); this.muted = false; this.timer = null; this.offset = 0; this.clicking = false; }
   ensureContext() {
     if (!this.ctx) {
       this.ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -33,7 +33,6 @@ export class Soundtrack {
   }
   start(track, leadIn=0) {
     this.stop(); this.track=track;this.beat=60/track.bpm;this.startTime=this.ctx.currentTime+.1+Math.max(leadIn,3*this.beat);this.step=0;
-    for(let i=0;i<3;i++) this.tone(i===2?880:660,this.startTime-(3-i)*this.beat,.07,'sine',.12);
     if(track.buffer){
       const source=this.own(this.ctx.createBufferSource());source.buffer=track.buffer;
       source.connect(this.master);source.start(this.startTime);return;
@@ -66,8 +65,6 @@ export class Soundtrack {
   // (learned from their taps, or set by hand) is taken off as well.
   get latency(){const c=this.ctx;if(!c)return 0;const v=(Number(c.outputLatency)||0)+(Number(c.baseLatency)||0);return Math.min(.5,Math.max(0,v));}
   get time(){return this.ctx?this.ctx.currentTime-this.latency-this.offset-this.startTime:0;}
-  // A short click the moment a lane is pressed, so every tap is heard.
-  hit(bright=false){if(!this.ctx||this.ctx.state!=='running'||!this.hitSound)return;const t=this.ctx.currentTime;this.tone(bright?2200:1600,t,.05,'sine',.14,bright?1400:1000);this.hiss(t,.02,5000,.06);}
   // The sync test's metronome: a click every `every` seconds, a higher one each bar. The clock
   // starts at the first click, so `time` reads where the clicks are heard, as in a song.
   startClicks(every){
