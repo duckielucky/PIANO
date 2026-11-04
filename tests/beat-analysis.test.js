@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
 import {analyzePcm,makeAudioChart,beatMap,spectralFlux,ANALYSIS_VERSION} from '../dist/beat-analysis.js';
 // Playable on a phone: lanes in range, nothing past the end, no lane reused within
 // .18 s of its last note ending, at most two lanes at once (never on Chill), and
@@ -187,4 +188,15 @@ test('stereo shares one FFT but each channel is still heard on its own',()=>{
   const right=x.map((v,i)=>i%rate<rate/2?v:0),mixed=spectralFlux([x,right],rate);
   for(let i=0;i<mono.length;i++){assert.ok(Math.abs(mono[i]-same[i])<1e-6);assert.ok(Math.abs(mono[i]-opposite[i])<1e-6);}
   assert.ok(mixed.some((v,i)=>Math.abs(v-mono[i])>1e-3),'a different right channel changes the pulse');
+});
+
+test('songs that ship with the game have their audio, a current analysis, and playable charts',async()=>{
+  const {SONGS}=await import('../dist/songs.js');const {createHash}=await import('node:crypto');
+  assert.ok(SONGS.length>=1);
+  for(const song of SONGS){
+    const [file,tag]=song.file.split('?v=');
+    assert.equal(tag,createHash('sha1').update(readFileSync(new URL('../dist/'+file,import.meta.url))).digest('hex').slice(0,10),song.id+' audio changed; run node scripts/bundle-songs.mjs');
+    assert.equal(song.analysis.version,ANALYSIS_VERSION,song.id+' analysed by an older version; run node scripts/bundle-songs.mjs');
+    for(const difficulty of ['easy','normal','hard']){const chart=makeAudioChart(song.analysis,difficulty);assert.ok(chart.length>song.duration*.5,song.id+' '+difficulty+' notes: '+chart.length);assertPlayable(chart,song.analysis,difficulty);}
+  }
 });

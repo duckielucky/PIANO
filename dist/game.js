@@ -4,6 +4,7 @@ import { makeAudioChart, beatMap, ANALYSIS_VERSION } from './beat-analysis.js?v=
 import { importSong } from './song-import.js?v=52be8e49a5';
 import { listSongs, saveSong, deleteSong, MAX_SONGS } from './song-library.js?v=8ebd178751';
 import { chooseLanguage, translate } from './i18n.js?v=9d99bcf74e';
+import { SONGS } from './songs.js?v=38c9846876';
 
 const $ = s => document.querySelector(s);
 const canvas=$('#canvas'), stage=$('#stage'), modal=$('#modal');
@@ -17,13 +18,18 @@ const trackTitle=track=>track.uploaded?track.title:t('track_'+track.id);
 const escapeHtml=value=>String(value).replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 let myTracks=[], importController=null, importNote=null, removing='';
 let uploadState={status:'idle',fileName:'',progress:null};
-const availableTracks=()=>[...myTracks,...TRACKS];
+// Songs that ship with the game play like uploaded ones: real audio and a beat analysis, made ahead of time.
+const bundledTracks=SONGS.map(song=>({...song,url:new URL(song.file,import.meta.url).href,buffer:null,uploaded:true,bundled:true,saved:true}));
+const builtInTracks=[...bundledTracks,...TRACKS];
+const availableTracks=()=>[...myTracks,...builtInTracks];
 const fromRecord=record=>({id:record.id,title:record.title,bpm:record.bpm,duration:record.duration,analysis:record.analysis,file:record.file,added:record.added,buffer:null,uploaded:true,saved:true});
 // Only the chosen song keeps decoded audio in memory; the others reload from their file when picked.
-function keepBuffer(item){myTracks.forEach(other=>{if(other!==item)other.buffer=null;});}
+function keepBuffer(item){[...myTracks,...bundledTracks].forEach(other=>{if(other!==item)other.buffer=null;});}
 function prepare(item){
   if(!item.uploaded||item.buffer)return Promise.resolve();
-  item.loading??=item.file.arrayBuffer().then(bytes=>audio.decode(bytes)).then(buffer=>{keepBuffer(item);item.buffer=buffer;}).finally(()=>{item.loading=null;});
+  // A built-in song's audio comes from the site, an uploaded one's from this device.
+  const read=()=>item.bundled?fetch(item.url).then(response=>{if(!response.ok)throw new Error('decodeError');return response.arrayBuffer();}):item.file.arrayBuffer();
+  item.loading??=read().then(bytes=>audio.decode(bytes)).then(buffer=>{keepBuffer(item);item.buffer=buffer;}).finally(()=>{item.loading=null;});
   return item.loading;
 }
 function addMySong(item){
@@ -35,7 +41,7 @@ function addMySong(item){
 }
 function removeMySong(id){
   myTracks=myTracks.filter(item=>item.id!==id);deleteSong(id).catch(()=>{});
-  if(track.id===id)setTrack(TRACKS[1]);
+  if(track.id===id)setTrack(builtInTracks[0]);
 }
 // The song's key: found in an uploaded song's sound; the original tracks are written in a minor key on their root note.
 const keyText=item=>{const key=item.uploaded?item.analysis?.key:{name:['C','C#','D','Eb','E','F','F#','G','Ab','A','Bb','B'][item.root%12],mode:'minor'};return key?t(key.mode==='major'?'keyMajor':'keyMinor',{note:key.name.replace('#','♯').replace(/(?<=.)b/,'♭')}):'';};
@@ -84,7 +90,7 @@ function importContent(){
 }
 function songCard(item){
   const card=`<button class="track-choice song-card ${item===track?'selected':''}" data-track="${item.id}" aria-pressed="${item===track}"><span class="song-symbol" aria-hidden="true">♫</span><span class="song-copy"><strong>${escapeHtml(trackTitle(item))}</strong><small>${songFacts(item,item.duration??item.bars*4*60/item.bpm)}${item.uploaded&&!item.saved?' · '+t('notSaved'):''}</small></span><span class="song-chevron" aria-hidden="true">→</span></button>`;
-  if(!item.uploaded)return card;
+  if(!item.uploaded||item.bundled)return card;
   const confirm=removing===item.id;
   return `<div class="song-item">${card}<button class="song-remove ${confirm?'confirm':''}" data-remove="${item.id}" aria-label="${escapeHtml(t('removeSong',{title:item.title}))}">${confirm?t('confirmRemove'):'✕'}</button></div>`;
 }
@@ -92,7 +98,7 @@ function songMenuContent(){
   const note=importNote?`<p class="import-note" role="status">${t('importSummary',{count:importNote.count})}${importNote.failed.length?` ${escapeHtml(t('importSkipped',{names:importNote.failed.join(', ')}))}`:''}</p>`:'';
   const upload=`<button class="song-upload" data-action="choose-file"><span class="song-symbol" aria-hidden="true">＋</span><span class="song-copy"><strong>${t('addSongs')}</strong><small>${t('addSongsHint')}</small></span></button>`;
   const mine=`<h3 class="song-section">${t('mySongs')}${myTracks.length?` <span>${myTracks.length}</span>`:''}</h3><div class="song-grid">${upload}${myTracks.map(songCard).join('')}</div>${myTracks.length?`<p class="song-saved-note">${t('librarySaved')}</p>`:''}`;
-  return `<h2>${t('chooseTrack')}</h2><p class="setup-intro">${t('chooseTrackHint')}</p>${note}${mine}<h3 class="song-section">${t('builtIn')}</h3><div class="song-grid">${TRACKS.map(songCard).join('')}</div>`;
+  return `<h2>${t('chooseTrack')}</h2><p class="setup-intro">${t('chooseTrackHint')}</p>${note}${mine}<h3 class="song-section">${t('builtIn')}</h3><div class="song-grid">${builtInTracks.map(songCard).join('')}</div>`;
 }
 function difficultyContent(){
   const notes=track.uploaded?makeAudioChart(track.analysis,difficulty):makeChart(track,difficulty);
@@ -129,7 +135,7 @@ function toggleLanguage(event){
   applyLanguage();if(inDialog)modal.querySelector('[data-language-toggle]').focus();
 }
 document.addEventListener('click',toggleLanguage);
-let track = TRACKS[1], difficulty='easy', mode='menu', run=null;
+let track = builtInTracks[0], difficulty='easy', mode='menu', run=null;
 let width=390,height=550,dpr=1, lastFrame=0, flashes=[0,0,0,0], flashColor=['121,184,255','121,184,255','121,184,255','121,184,255'], missFlashes=[0,0,0,0], particles=[], ripples=[], pointers=new Map(), keys=new Set();
 let dialogType='', session=0, allowPortrait=false, flares=[];
 const portraitScreen=matchMedia('(max-width: 600px) and (orientation: portrait)');

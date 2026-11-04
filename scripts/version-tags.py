@@ -6,7 +6,7 @@ import hashlib, pathlib, re
 
 dist = pathlib.Path(__file__).resolve().parent.parent / 'dist'
 texts = [p for p in dist.iterdir() if p.suffix in ('.html', '.js', '.css')]
-pattern = re.compile(r'([\w.-]+\.(?:js|css|png|webp))\?v=([0-9a-f]+)')
+pattern = re.compile(r'([\w.-]+\.(?:js|css|png|webp|mp3))\?v=([0-9a-f]+)')
 while True:
     changed = False
     for page in texts:
