@@ -228,11 +228,12 @@ dialog .song-saved-note{margin:8px 0 0;font-size:10px;color:#9a8cb4}
 
 /* Touch screens: a taller tap zone for thumbs, and no keyboard letters. */
 @media(pointer:coarse){.lane-inputs{height:50%}.lane-inputs span{display:none}}
-/* Upright phones: the song card steps aside and the score shrinks while a song plays, so the lanes get the room. */
-body.portrait-fallback:not([data-state="menu"]) .track-footer{display:none}
-body.portrait-fallback:not([data-state="menu"]) .scoreboard{padding-top:8px;padding-bottom:8px}
-body.portrait-fallback:not([data-state="menu"]) #score{font-size:22px}
-body.portrait-fallback:not([data-state="menu"]) .energy{margin-bottom:12px}
+/* Full screen: under the header the lanes take the whole screen, with no score panel or song card.
+   On Normal and Hard a thin line along the top of the lanes shows the energy left. */
+.phone .scoreboard,.phone .track-footer{display:none}
+.stage{grid-column:1/-1;border-left:0}
+.stage .energy{position:absolute;top:0;left:0;right:0;width:auto;height:3px;margin:0;border-radius:0;background:#ffffff14;z-index:3;pointer-events:none}
+.stage .energy span,.stage .energy b{display:none}
 
 /* Early / late under GREAT and GOOD. */
 .judgment small{display:block;margin-top:2px;font-size:11px;letter-spacing:3px;opacity:.85}

@@ -236,7 +236,7 @@ function setTrack(next){
   $('#trackDetail').textContent=songFacts(track,Math.round(duration()));
   $('#best').textContent=format(readBest());
 }
-function setDifficulty(value){difficulty=value;$('#energyLabel').textContent=t(value==='easy'?'noFail':'energy');$('#difficultyLabel').textContent=t(value);document.querySelectorAll('[data-difficulty]').forEach(b=>{const active=b.dataset.difficulty===value;b.classList.toggle('selected',active);b.setAttribute('aria-pressed',String(active));});$('#best').textContent=format(readBest());}
+function setDifficulty(value){difficulty=value;$('#energyLabel').textContent=t(value==='easy'?'noFail':'energy');$('#difficultyLabel').textContent=t(value);$('.energy').hidden=value==='easy';document.querySelectorAll('[data-difficulty]').forEach(b=>{const active=b.dataset.difficulty===value;b.classList.toggle('selected',active);b.setAttribute('aria-pressed',String(active));});$('#best').textContent=format(readBest());}
 function resize(){const r=stage.getBoundingClientRect();width=r.width;height=r.height;dpr=Math.min(devicePixelRatio||1,2);canvas.width=Math.round(width*dpr);canvas.height=Math.round(height*dpr);ctx.setTransform(dpr,0,0,dpr,0,0);scenery=null;}
 new ResizeObserver(resize).observe(stage);
 
@@ -560,15 +560,21 @@ $('#modalContent').addEventListener('click',e=>{
   if(choice){setDifficulty(choice);renderDialog();$(`[data-difficulty="${choice}"]`).focus();}
 });
 modal.addEventListener('cancel',e=>{e.preventDefault();if(dialogType==='pause')resume();else backDialog();});
-// The game opens on a start screen; PLAY there leads straight to choosing a song.
+// The game opens on a start screen; PLAY there goes full screen and leads straight to choosing a song.
+// The song list opens once full screen is on, so it stays above the page. iPhone Safari has no full
+// screen for pages; there the game already fills the screen.
 let startTimer=0;
-function leaveStart(){const screen=$('#startScreen');if(!screen||screen.hidden)return;screen.classList.add('leaving');document.body.classList.remove('at-start');startTimer=setTimeout(()=>{screen.hidden=true;},350);trackMenu();}
+async function enterFullscreen(){
+  if(document.fullscreenElement||!document.documentElement.requestFullscreen)return;
+  try{await document.documentElement.requestFullscreen();await screen.orientation?.lock?.('landscape');}catch{}
+}
+function leaveStart(){const screen=$('#startScreen');if(!screen||screen.hidden)return;screen.classList.add('leaving');document.body.classList.remove('at-start');startTimer=setTimeout(()=>{screen.hidden=true;},350);enterFullscreen().then(trackMenu);}
 function showStart(){clearTimeout(startTimer);closeModal();const screen=$('#startScreen');screen.hidden=false;screen.classList.remove('leaving');document.body.classList.add('at-start');$('#startButton').focus({preventScroll:true});}
 listSongs().then(records=>{myTracks=[...myTracks,...records.filter(record=>!myTracks.some(item=>item.id===record.id)).map(fromRecord)];if(dialogType==='tracks'&&modal.open)renderDialog();}).catch(()=>{});
 document.body.classList.add('at-start');$('#startButton').addEventListener('click',leaveStart);$('#startButton').focus({preventScroll:true});
 $('#pauseButton').addEventListener('click',pause);$('#helpButton').addEventListener('click',help);$('#trackButton').addEventListener('click',trackMenu);
 $('#soundButton').addEventListener('click',()=>{audio.setMuted(!audio.muted);syncSoundLabel();$('#soundButton').style.color=audio.muted?'#ff7b9f':'';$('#soundButton').innerHTML=audio.muted?'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m11 5-6 4H2v6h3l6 4zM16 9l6 6M22 9l-6 6"/></svg>':'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m11 5-6 4H2v6h3l6 4zM15 8a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14"/></svg>';});
-$('#fullscreenButton').addEventListener('click',async()=>{try{if(document.fullscreenElement){await document.exitFullscreen();screen.orientation?.unlock?.();}else if(document.documentElement.requestFullscreen){await document.documentElement.requestFullscreen();try{await screen.orientation?.lock?.('landscape');}catch{}}}catch{}});
+$('#fullscreenButton').addEventListener('click',async()=>{if(!document.fullscreenElement)return enterFullscreen();try{await document.exitFullscreen();screen.orientation?.unlock?.();}catch{}});
 document.addEventListener('visibilitychange',()=>{if(document.hidden)pause();});window.addEventListener('blur',()=>{if(mode==='playing'||mode==='countdown')pause();});
 
 function frame(now){
