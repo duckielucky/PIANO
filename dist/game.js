@@ -1,9 +1,7 @@
-import { TRACKS, makeChart, trackMap, gradeTiming, gradeAccuracy, Run, syncStep, SYNC_RANGE, SONG_LIMIT, SONG_FADE, limitChart } from './engine.js?v=68d9b3f2fb';
+import { TRACKS, makeChart, trackMap, gradeTiming, gradeAccuracy, Run, syncStep, SYNC_RANGE, SONG_LIMIT, SONG_FADE, limitChart } from './engine.js?v=c9f6aa1533';
 import { Soundtrack } from './audio.js?v=90cd7f608e';
-import { makeAudioChart, beatMap, ANALYSIS_VERSION } from './beat-analysis.js?v=278b77f1d1';
-import { importSong } from './song-import.js?v=507ca187e5';
-import { listSongs, saveSong, deleteSong, MAX_SONGS } from './song-library.js?v=8ebd178751';
-import { chooseLanguage, translate } from './i18n.js?v=9d99bcf74e';
+import { makeAudioChart, beatMap } from './beat-analysis.js?v=278b77f1d1';
+import { chooseLanguage, translate } from './i18n.js?v=d60e454469';
 import { SONGS } from './songs.js?v=9aab7fab42';
 
 const $ = s => document.querySelector(s);
@@ -14,100 +12,35 @@ let savedLanguage;
 try { savedLanguage=localStorage.getItem('vipermix-language'); } catch {}
 let language=chooseLanguage(savedLanguage,navigator.language), lastResult=null;
 const t=(key,values)=>translate(language,key,values);
-const trackTitle=track=>track.uploaded?track.title:t('track_'+track.id);
+const trackTitle=track=>track.recorded?track.title:t('track_'+track.id);
 const escapeHtml=value=>String(value).replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
-let myTracks=[], importController=null, importNote=null, removing='';
-let uploadState={status:'idle',fileName:'',progress:null};
-// Songs that ship with the game play like uploaded ones: real audio and a beat analysis, made ahead of time.
-const bundledTracks=SONGS.map(song=>({...song,url:new URL(song.file,import.meta.url).href,buffer:null,uploaded:true,bundled:true,saved:true}));
-const builtInTracks=[...bundledTracks,...TRACKS];
-const availableTracks=()=>[...myTracks,...builtInTracks];
-const fromRecord=record=>({id:record.id,title:record.title,bpm:record.bpm,duration:record.duration,analysis:record.analysis,file:record.file,added:record.added,buffer:null,uploaded:true,saved:true});
-// Only the chosen song keeps decoded audio in memory; the others reload from their file when picked.
-function keepBuffer(item){[...myTracks,...bundledTracks].forEach(other=>{if(other!==item)other.buffer=null;});}
+// Recorded songs ship with the game: real audio and a beat analysis, made ahead of time.
+const recordedTracks=SONGS.map(song=>({...song,url:new URL(song.file,import.meta.url).href,buffer:null,recorded:true}));
+const builtInTracks=[...recordedTracks,...TRACKS];
+// Only the chosen song keeps decoded audio in memory; the others load from the site again when picked.
+function keepBuffer(item){recordedTracks.forEach(other=>{if(other!==item)other.buffer=null;});}
 function prepare(item){
-  if(!item.uploaded||item.buffer)return Promise.resolve();
-  // A built-in song's audio comes from the site, an uploaded one's from this device.
-  const read=()=>item.bundled?fetch(item.url).then(response=>{if(!response.ok)throw new Error('decodeError');return response.arrayBuffer();}):item.file.arrayBuffer();
-  item.loading??=read().then(bytes=>audio.decode(bytes)).then(buffer=>{keepBuffer(item);item.buffer=buffer;}).finally(()=>{item.loading=null;});
+  if(!item.recorded||item.buffer)return Promise.resolve();
+  item.loading??=fetch(item.url).then(response=>{if(!response.ok)throw new Error('decodeError');return response.arrayBuffer();}).then(bytes=>audio.decode(bytes)).then(buffer=>{keepBuffer(item);item.buffer=buffer;}).finally(()=>{item.loading=null;});
   return item.loading;
 }
-function addMySong(item){
-  item.added=Date.now();item.saved=false;
-  myTracks=[item,...myTracks.filter(other=>other.id!==item.id)];keepBuffer(item);
-  const {id,title,bpm,duration,analysis,file,added}=item;
-  saveSong({id,title,bpm,duration,analysis,file,added}).then(()=>{item.saved=true;if(dialogType==='tracks'&&modal.open)renderDialog();}).catch(()=>{});
-  for(const old of myTracks.splice(MAX_SONGS))deleteSong(old.id).catch(()=>{});
-}
-function removeMySong(id){
-  myTracks=myTracks.filter(item=>item.id!==id);deleteSong(id).catch(()=>{});
-  if(track.id===id)setTrack(builtInTracks[0]);
-}
-// The song's key: found in an uploaded song's sound; the original tracks are written in a minor key on their root note.
-const keyText=item=>{const key=item.uploaded?item.analysis?.key:{name:['C','C#','D','Eb','E','F','F#','G','Ab','A','Bb','B'][item.root%12],mode:'minor'};return key?t(key.mode==='major'?'keyMajor':'keyMinor',{note:key.name.replace('#','♯').replace(/(?<=.)b/,'♭')}):'';};
-const songFacts=(item,seconds)=>[item.uploaded?t('estimatedBpm',{bpm:item.bpm}):item.bpm+' BPM',keyText(item),clockText(seconds)].filter(Boolean).join(' · ');
+// The song's key: found in a recorded song's sound; the original tracks are written in a minor key on their root note.
+const keyText=item=>{const key=item.recorded?item.analysis?.key:{name:['C','C#','D','Eb','E','F','F#','G','Ab','A','Bb','B'][item.root%12],mode:'minor'};return key?t(key.mode==='major'?'keyMajor':'keyMinor',{note:key.name.replace('#','♯').replace(/(?<=.)b/,'♭')}):'';};
+const songFacts=(item,seconds)=>[item.recorded?t('estimatedBpm',{bpm:item.bpm}):item.bpm+' BPM',keyText(item),clockText(seconds)].filter(Boolean).join(' · ');
 const clockText=seconds=>{const total=Math.round(seconds);return `${Math.floor(total/60).toString().padStart(2,'0')}:${(total%60).toString().padStart(2,'0')}`;};
-function chooseFile(){
-  if(mode!=='menu')return;
-  $('#songFile').value='';$('#songFile').click();
-}
-// Several files import one after another; each one that works joins My songs.
-async function loadSongs(fileList){
-  const files=[...(fileList||[])].filter(Boolean);
-  if(!files.length||mode!=='menu')return;
-  importController?.abort();const controller=new AbortController();importController=controller;
-  const added=[],failed=[],total=files.length;
-  try{
-    for(const [index,file] of files.entries()){
-      uploadState={status:'decoding',fileName:file.name,progress:null,index:index+1,total};showDialog('import');
-      try{
-        const imported=await importSong(file,audio,controller.signal,(status,progress)=>{
-          if(importController!==controller||controller.signal.aborted)return;
-          uploadState={...uploadState,status,progress};if(dialogType==='import'&&modal.open)renderDialog();
-        });
-        if(controller.signal.aborted||importController!==controller)return;
-        if(!makeAudioChart(imported.analysis,'easy').length)throw new Error('analysisError');
-        addMySong(imported);added.push(imported);
-      }catch(error){
-        if(controller.signal.aborted||importController!==controller)return;
-        const known=['decodeError','fileTooLarge','songTooLong','songTooShort','silentSong','analysisError'];
-        if(total===1){uploadState={status:'error',fileName:file.name,error:known.includes(error.message)?error.message:'analysisError'};renderDialog();return;}
-        failed.push(file.name);
-      }
-    }
-    importController=null;
-    if(added.length)setTrack(added.at(-1));
-    uploadState={status:'ready',fileName:added.at(-1)?.title??'',progress:100};
-    if(total===1)showDialog('difficulty');
-    else{importNote={count:added.length,failed};showDialog('tracks');}
-  }finally{if(importController===controller)importController=null;}
-}
-function importContent(){
-  const {status,fileName,progress,index,total}=uploadState;
-  const name=`${total>1?`<p class="import-count">${t('importCount',{index,total})}</p>`:''}<p class="import-filename">${escapeHtml(fileName)}</p>`;
-  if(status==='error')return `<h2>${t('importFailed')}</h2>${name}<p class="import-error" role="alert">${t(uploadState.error)}</p><button class="primary-button" data-action="choose-file">${t('changeSong')}</button><button class="secondary-button" data-action="back-songs">${t('back')}</button>`;
-  return `<div class="analysis-orbit" aria-hidden="true">♫</div><h2>${t(status)}</h2>${name}<progress class="analysis-progress" ${progress===null?'':`value="${progress}"`} max="100" aria-label="${t(status)}"></progress><p class="import-hint" role="status">${progress===null?t('decoding'):t('analyzing')+' '+progress+'%'}</p><button class="secondary-button" data-action="back-songs">${t('cancel')}</button>`;
-}
 function songCard(item){
-  const card=`<button class="track-choice song-card ${item===track?'selected':''}" data-track="${item.id}" aria-pressed="${item===track}"><span class="song-symbol" aria-hidden="true">♫</span><span class="song-copy"><strong>${escapeHtml(trackTitle(item))}</strong><small>${songFacts(item,Math.min(SONG_LIMIT,item.duration??item.bars*4*60/item.bpm))}${item.uploaded&&!item.saved?' · '+t('notSaved'):''}</small></span><span class="song-chevron" aria-hidden="true">→</span></button>`;
-  if(!item.uploaded||item.bundled)return card;
-  const confirm=removing===item.id;
-  return `<div class="song-item">${card}<button class="song-remove ${confirm?'confirm':''}" data-remove="${item.id}" aria-label="${escapeHtml(t('removeSong',{title:item.title}))}">${confirm?t('confirmRemove'):'✕'}</button></div>`;
+  const card=`<button class="track-choice song-card ${item===track?'selected':''}" data-track="${item.id}" aria-pressed="${item===track}"><span class="song-symbol" aria-hidden="true">♫</span><span class="song-copy"><strong>${escapeHtml(trackTitle(item))}</strong><small>${songFacts(item,Math.min(SONG_LIMIT,item.duration??item.bars*4*60/item.bpm))}</small></span><span class="song-chevron" aria-hidden="true">→</span></button>`;
+  return card;
 }
 function songMenuContent(){
-  const note=importNote?`<p class="import-note" role="status">${t('importSummary',{count:importNote.count})}${importNote.failed.length?` ${escapeHtml(t('importSkipped',{names:importNote.failed.join(', ')}))}`:''}</p>`:'';
-  const upload=`<button class="song-upload" data-action="choose-file"><span class="song-symbol" aria-hidden="true">＋</span><span class="song-copy"><strong>${t('addSongs')}</strong><small>${t('addSongsHint')}</small></span></button>`;
-  const mine=`<h3 class="song-section">${t('mySongs')}${myTracks.length?` <span>${myTracks.length}</span>`:''}</h3><div class="song-grid">${upload}${myTracks.map(songCard).join('')}</div>${myTracks.length?`<p class="song-saved-note">${t('librarySaved')}</p>`:''}`;
-  return `<h2>${t('chooseTrack')}</h2><p class="setup-intro">${t('chooseTrackHint')}</p>${note}${mine}<h3 class="song-section">${t('builtIn')}</h3><div class="song-grid">${builtInTracks.map(songCard).join('')}</div>`;
+  return `<h2>${t('chooseTrack')}</h2><p class="setup-intro">${t('chooseTrackHint')}</p><div class="song-grid">${builtInTracks.map(songCard).join('')}</div>`;
 }
+// Paused, a different difficulty starts the song again with that difficulty's notes.
+const pauseDifficulty=()=>`<p class="pause-label">${t('changeDifficulty')}</p><div class="difficulty-selector" role="group" aria-label="${t('difficulty')}">`+['easy','normal','hard'].map(value=>`<button class="${value===difficulty?'selected':''}" data-difficulty="${value}" aria-pressed="${value===difficulty}">${t(value)}</button>`).join('')+`</div>`;
 function difficultyContent(){
-  const notes=track.uploaded?makeAudioChart(track.analysis,difficulty):makeChart(track,difficulty);
-  return `<h2>${t('chooseDifficulty')}</h2><div class="selected-track"><span class="song-symbol" aria-hidden="true">♫</span><div><small>${t('selectedSong')}</small><strong>${escapeHtml(trackTitle(track))}</strong><span>${songFacts(track,duration())}</span></div></div><div class="difficulty-cards" role="group" aria-label="${t('difficulty')}">`+['easy','normal','hard'].map((value,i)=>`<button class="difficulty-card ${value===difficulty?'selected':''}" data-difficulty="${value}" aria-pressed="${value===difficulty}"><span class="difficulty-bars" aria-hidden="true">${[0,1,2].map(n=>`<i class="${n<=i?'lit':''}"></i>`).join('')}</span><strong>${t(value)}</strong><small>${t(value+'Hint')}</small></button>`).join('')+`</div><div class="setup-summary" role="status"><span>${t('noteCount',{count:notes.length})}</span><span>${t(difficulty==='easy'?'noFail':'tapHold')}</span></div><div class="setup-extras"><p class="setup-tune">${t('followsTune')}</p>${syncRow(true)}</div>${track.uploaded&&track.analysis.weakBeat?`<p class="setup-warning">${t('weakBeat')}</p>`:''}<button class="primary-button setup-start" data-action="start-game"><span aria-hidden="true">▶</span>${t('startGame')}</button>`;
+  const notes=track.recorded?makeAudioChart(track.analysis,difficulty):makeChart(track,difficulty);
+  return `<h2>${t('chooseDifficulty')}</h2><div class="selected-track"><span class="song-symbol" aria-hidden="true">♫</span><div><small>${t('selectedSong')}</small><strong>${escapeHtml(trackTitle(track))}</strong><span>${songFacts(track,duration())}</span></div></div><div class="difficulty-cards" role="group" aria-label="${t('difficulty')}">`+['easy','normal','hard'].map((value,i)=>`<button class="difficulty-card ${value===difficulty?'selected':''}" data-difficulty="${value}" aria-pressed="${value===difficulty}"><span class="difficulty-bars" aria-hidden="true">${[0,1,2].map(n=>`<i class="${n<=i?'lit':''}"></i>`).join('')}</span><strong>${t(value)}</strong><small>${t(value+'Hint')}</small></button>`).join('')+`</div><div class="setup-summary" role="status"><span>${t('noteCount',{count:notes.length})}</span><span>${t(difficulty==='easy'?'noFail':'tapHold')}</span></div><div class="setup-extras"><p class="setup-tune">${t('followsTune')}</p>${syncRow(true)}</div>${track.recorded&&track.analysis.weakBeat?`<p class="setup-warning">${t('weakBeat')}</p>`:''}<button class="primary-button setup-start" data-action="start-game"><span aria-hidden="true">▶</span>${t('startGame')}</button>`;
 }
-$('#songFile').addEventListener('change',event=>loadSongs(event.target.files));
-modal.addEventListener('dragover',event=>{if(dialogType==='import'){event.preventDefault();modal.classList.add('file-dragover');}});
-modal.addEventListener('dragleave',()=>modal.classList.remove('file-dragover'));
-modal.addEventListener('drop',event=>{if(dialogType==='import'){event.preventDefault();modal.classList.remove('file-dragover');loadSongs(event.dataTransfer.files);}});
 
 function updateLanguageButtons(){
   document.querySelectorAll('[data-language-toggle]').forEach(button=>{
@@ -154,7 +87,7 @@ function pop(element){if(!reducedMotion)element.animate([{transform:'scale(1.13)
 const reducedMotion=matchMedia('(prefers-reduced-motion: reduce)').matches;
 const travel=()=>difficulty==='hard'?1.7:difficulty==='easy'?3.25:2.75;
 // The song's beats and how hard each bar hits, worked out once per song.
-const beatGrid=item=>item.beatGrid??=(item.uploaded?beatMap(item.analysis):trackMap(item));
+const beatGrid=item=>item.beatGrid??=(item.recorded?beatMap(item.analysis):trackMap(item));
 function beatAt(grid,t){
   let lo=0,hi=grid.beats.length-1;if(hi<0||t<grid.beats[0])return {k:-1,since:9,level:1,bar:false};
   while(lo<hi){const mid=(lo+hi+1)>>1;if(grid.beats[mid]<=t)lo=mid;else hi=mid-1;}
@@ -232,7 +165,7 @@ function readBest(){try{return Number(localStorage.getItem(bestKey()))||0;}catch
 function saveBest(score){try{localStorage.setItem(bestKey(),String(score));}catch{}}
 const format=n=>Math.round(n).toString().padStart(7,'0');
 function setTrack(next){
-  track=next;$('#trackName').textContent=trackTitle(track);$('#trackName').title=trackTitle(track);$('#bpmLabel').textContent=track.uploaded?t('estimatedBpm',{bpm:track.bpm}):track.bpm+' BPM';
+  track=next;$('#trackName').textContent=trackTitle(track);$('#trackName').title=trackTitle(track);$('#bpmLabel').textContent=track.recorded?t('estimatedBpm',{bpm:track.bpm}):track.bpm+' BPM';
   $('#trackDetail').textContent=songFacts(track,Math.round(duration()));
   $('#best').textContent=format(readBest());
 }
@@ -433,8 +366,8 @@ async function start(){
   const token=++session; closeModal();
   try{await audio.unlock();await prepare(track);}catch(e){showError();return;}
   if(token!==session)return;
-  run=new Run(limitChart(track.uploaded?makeAudioChart(track.analysis,difficulty):makeChart(track,difficulty),duration()),difficulty);syncSamples=[];sinceSync=0;cheerUntil=cheerRank=0;perfectRun=missRun=lastLevel=0;lowEnergy=false;$('#cheer').classList.remove('show');lastScore=lastCombo=lastEnergy=-1;keys.clear();pointers.clear();particles=[];ripples=[];flares=[];missFlashes=[0,0,0,0];lastCountdown=null;
-  audio.start(track,track.uploaded?travel()+.35:0,duration(),SONG_FADE);setMode('countdown');$('#pauseButton').disabled=false;$('#nextTrack').hidden=true;$('#trackButton').disabled=true;$('#playingBars').hidden=false;$('#countdown').hidden=false;$('#songProgress').style.width='0%';updateHUD();
+  run=new Run(limitChart(track.recorded?makeAudioChart(track.analysis,difficulty):makeChart(track,difficulty),duration()),difficulty);syncSamples=[];sinceSync=0;cheerUntil=cheerRank=0;perfectRun=missRun=lastLevel=0;lowEnergy=false;$('#cheer').classList.remove('show');lastScore=lastCombo=lastEnergy=-1;keys.clear();pointers.clear();particles=[];ripples=[];flares=[];missFlashes=[0,0,0,0];lastCountdown=null;
+  audio.start(track,track.recorded?travel()+.35:0,duration(),SONG_FADE);setMode('countdown');$('#pauseButton').disabled=false;$('#nextTrack').hidden=true;$('#trackButton').disabled=true;$('#playingBars').hidden=false;$('#countdown').hidden=false;$('#songProgress').style.width='0%';updateHUD();
 }
 function showError(){showDialog('error');}
 function isLaneDown(lane){return keys.has(lane)||[...pointers.values()].some(p=>p.lane===lane);}
@@ -498,8 +431,7 @@ function finish(reason='complete'){
 }
 function closeModal(){
   audio.stopClicks();
-  if(dialogType==='import'&&importController){importController.abort();importController=null;uploadState={status:'idle',fileName:'',progress:null};}
-  if(modal.open)modal.close();dialogType='';modal.classList.remove('file-dragover');
+  if(modal.open)modal.close();dialogType='';
 }
 function showDialog(type){if(type!=='sync')audio.stopClicks();dialogType=type;renderDialog();if(!modal.open)modal.showModal();}
 function help(){showDialog('help');}
@@ -516,16 +448,15 @@ function dismiss(){
 }
 function backDialog(){
   if(dialogType==='sync')showDialog('difficulty');
-  else if(dialogType==='difficulty'||dialogType==='import')backToSongs();
+  else if(dialogType==='difficulty')backToSongs();
   else if(dialogType==='results')goHome();
   else dismiss();
 }
 function renderDialog(){
   modal.dataset.dialog=dialogType;
   let content='';
-  if(dialogType==='import')content=importContent();
   if(dialogType==='error')content=`<div class="eyebrow">${t('retry')}</div><h2>${t('oneMoreBeat')}</h2><p>${t('audioError')}</p><button class="primary-button" data-action="close">${t('gotIt')}</button>`;
-  if(dialogType==='pause')content=`<h2><em>${t('paused')}</em></h2>${syncRow()}<button class="primary-button" data-action="resume">${t('resume')} <span>▶</span></button><button class="secondary-button" data-action="restart">${t('restart')}</button><button class="secondary-button" data-action="home">${t('changeSong')}</button>`;
+  if(dialogType==='pause')content=`<h2><em>${t('paused')}</em></h2>${pauseDifficulty()}${syncRow()}<button class="primary-button" data-action="resume">${t('resume')} <span>▶</span></button><button class="secondary-button" data-action="restart">${t('restart')}</button><button class="secondary-button" data-action="home">${t('changeSong')}</button>`;
   if(dialogType==='help')content=`<h2>${t('tap')} <em>+ ${t('hold')}</em></h2><div class="tutorial-row"><div class="note-demo"><span class="note-icon tap"></span></div><div><strong>${t('tap')}</strong><p>${t('tapHelp')}</p></div></div><div class="tutorial-row"><div class="note-demo"><span class="note-icon hold"></span></div><div><strong>${t('hold')}</strong><p>${t('holdHelp')}</p></div></div><p class="key-hint">${t('keyboardHelp')}</p><button class="primary-button" data-action="close">${t('gotIt')}</button>`;
   if(dialogType==='tracks')content=songMenuContent();
   if(dialogType==='difficulty')content=difficultyContent();
@@ -541,25 +472,19 @@ function renderDialog(){
 }
 $('#modalContent').addEventListener('click',e=>{
   const action=e.target.closest('[data-action]')?.dataset.action;
-  if(action==='choose-file')chooseFile();
   if(action==='start-game'&&dialogType==='difficulty')start();
   if(action==='back-songs')backToSongs();
   if(action==='sync-test')openSyncTest();if(action==='sync-done')showDialog('difficulty');
   if(action==='close')dismiss();if(action==='resume')resume();if(action==='restart')start();if(action==='home')goHome();
-  const remove=e.target.closest('[data-remove]')?.dataset.remove;
-  if(remove){if(removing===remove){removing='';removeMySong(remove);}else removing=remove;renderDialog();$(`[data-remove="${remove}"]`)?.focus();return;}
-  if(removing){removing='';if(dialogType==='tracks')renderDialog();}
-  if(action==='choose-file')importNote=null;
   const id=e.target.closest('[data-track]')?.dataset.track;
   if(id){
-    const item=availableTracks().find(entry=>entry.id===id);importNote=null;
-    // A song saved before the current beat finder is analysed again, once, from its saved file.
-    if(item.uploaded&&item.analysis?.version!==ANALYSIS_VERSION&&item.file){loadSongs([new File([item.file],item.file.name||item.title,{type:item.file.type})]);return;}
+    const item=builtInTracks.find(entry=>entry.id===id);
     setTrack(item);prepare(item).catch(()=>{});showDialog('difficulty');
   }
   const sync=e.target.closest('[data-sync]')?.dataset.sync;
   if(sync){setSync(audio.offset+Number(sync)*.01);$('#modalContent .sync-row output').textContent=syncText();return;}
   const choice=e.target.closest('[data-difficulty]')?.dataset.difficulty;
+  if(choice&&dialogType==='pause'){if(choice!==difficulty){setDifficulty(choice);start();}return;}
   if(choice){setDifficulty(choice);renderDialog();$(`[data-difficulty="${choice}"]`).focus();}
 });
 modal.addEventListener('cancel',e=>{e.preventDefault();if(dialogType==='pause')resume();else backDialog();});
@@ -573,7 +498,6 @@ async function enterFullscreen(){
 }
 function leaveStart(){const screen=$('#startScreen');if(!screen||screen.hidden)return;screen.classList.add('leaving');document.body.classList.remove('at-start');startTimer=setTimeout(()=>{screen.hidden=true;},350);enterFullscreen().then(trackMenu);}
 function showStart(){clearTimeout(startTimer);closeModal();const screen=$('#startScreen');screen.hidden=false;screen.classList.remove('leaving');document.body.classList.add('at-start');$('#startButton').focus({preventScroll:true});}
-listSongs().then(records=>{myTracks=[...myTracks,...records.filter(record=>!myTracks.some(item=>item.id===record.id)).map(fromRecord)];if(dialogType==='tracks'&&modal.open)renderDialog();}).catch(()=>{});
 document.body.classList.add('at-start');$('#startButton').addEventListener('click',leaveStart);$('#startButton').focus({preventScroll:true});
 $('#pauseButton').addEventListener('click',pause);$('#helpButton').addEventListener('click',help);$('#trackButton').addEventListener('click',trackMenu);
 $('#soundButton').addEventListener('click',()=>{audio.setMuted(!audio.muted);syncSoundLabel();$('#soundButton').style.color=audio.muted?'#ff7b9f':'';$('#soundButton').innerHTML=audio.muted?'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m11 5-6 4H2v6h3l6 4zM16 9l6 6M22 9l-6 6"/></svg>':'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m11 5-6 4H2v6h3l6 4zM15 8a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14"/></svg>';});

@@ -6,12 +6,12 @@
   <meta name="theme-color" content="#120a24">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="description" content="Upload a song and VIPERMIX turns its beats into a rhythm game. Tap blue notes and hold purple notes. Play in English or Chinese.">
+  <meta name="description" content="VIPERMIX is a rhythm game on real songs: tap blue notes and hold purple notes to the beat. Play in English or Chinese.">
   <title>VIPERMIX — Find your rhythm</title>
   <link rel="icon" href="vipermix-icon.png?v=faf2080b37" type="image/png">
   <link rel="stylesheet" href="style.css?v=e55e7d35a2">
   <link rel="stylesheet" href="landscape.css?v=565eee5668">
-  <link rel="stylesheet" href="theme.css?v=9a08155b1e">
+  <link rel="stylesheet" href="theme.css?v=3d560a5f31">
 </head>
 <body data-state="menu">
   <main class="phone" id="game" data-i18n-aria="game" aria-label="VIPERMIX rhythm game">
@@ -28,7 +28,6 @@
       <div class="countdown" id="countdown" hidden></div>
     </section>
     <footer class="track-footer"><button class="track-art" id="trackButton" data-i18n-aria="changeTrack" aria-label="Change track"><svg viewBox="0 0 48 48" aria-hidden="true"><path d="M5 30 17 7 25 29 34 12 43 30 32 39 16 38Z"/><path d="m5 30 20-1 7 10M17 7l-1 31m18-26-9 17 18 1"/></svg></button><div class="track-info"><strong id="trackName">Afterglow</strong><span id="trackDetail">110 BPM · 00:52</span></div><button class="next-track icon-button" id="nextTrack" data-i18n-aria="nextTrack" aria-label="Select next track" data-i18n-title="nextTrack" title="Next track">⌃<span>⌄</span></button><div class="playing-bars" id="playingBars" hidden><i></i><i></i><i></i><i></i></div></footer><div class="song-progress"><div id="songProgress"></div></div>
-    <input type="file" id="songFile" accept="audio/*,.mp3,.wav,.m4a,.aac,.ogg,.flac,.aiff,.webm" multiple hidden>
     <dialog id="modal"><div id="modalContent"></div></dialog>
   </main>
   <section class="start-screen" id="startScreen" aria-labelledby="startTitle">
@@ -47,12 +46,10 @@
     <h2><span data-i18n="turn">TURN</span><br><em data-i18n="sideways">SIDEWAYS.</em></h2>
     <button class="text-button" id="portraitButton" data-i18n="portrait">PLAY HERE ANYWAY</button>
   </section>
-  <link rel="modulepreload" href="engine.js?v=68d9b3f2fb">
+  <link rel="modulepreload" href="engine.js?v=c9f6aa1533">
   <link rel="modulepreload" href="audio.js?v=90cd7f608e">
   <link rel="modulepreload" href="beat-analysis.js?v=278b77f1d1">
-  <link rel="modulepreload" href="song-import.js?v=507ca187e5">
-  <link rel="modulepreload" href="song-library.js?v=8ebd178751">
-  <link rel="modulepreload" href="i18n.js?v=9d99bcf74e">
-  <script type="module" src="game.js?v=57cfe590f0"></script>
+  <link rel="modulepreload" href="i18n.js?v=d60e454469">
+  <script type="module" src="game.js?v=f78f1de671"></script>
 </body>
 </html>

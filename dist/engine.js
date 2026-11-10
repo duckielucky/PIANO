@@ -38,7 +38,7 @@ export function songSection(track, bar) {
   if (bar === half + 4) return 'drop';
   return bar % 4 === 3 ? 'fill' : 'groove';
 }
-// The same beat map uploaded songs get: every beat, and how hard its bar hits (0 calm, 1 groove, 2 peak).
+// The same beat map recorded songs get: every beat, and how hard its bar hits (0 calm, 1 groove, 2 peak).
 export function trackMap(track) {
   const beat = 60 / track.bpm, beats = [], levels = [];
   for (let k = 0; k < track.bars * 4; k++) {

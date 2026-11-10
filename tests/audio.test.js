@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {Soundtrack} from '../dist/audio.js';
 
-test('uploaded audio and notes use one clock, pause/resume and restart stop old sources',async()=>{
+test('recorded audio and notes use one clock, pause/resume and restart stop old sources',async()=>{
   const sources=[],audio=new Soundtrack();
   audio.master={};audio.tone=()=>{};
   audio.ctx={currentTime:40,state:'running',
