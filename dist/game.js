@@ -1,5 +1,5 @@
-import { TRACKS, makeChart, trackMap, gradeTiming, gradeAccuracy, Run, syncStep, SYNC_RANGE, SONG_LIMIT, SONG_FADE, limitChart } from './engine.js?v=c9f6aa1533';
-import { Soundtrack } from './audio.js?v=90cd7f608e';
+import { TRACKS, makeChart, trackMap, gradeTiming, gradeAccuracy, Run, syncStep, SYNC_RANGE, SONG_LIMIT, SONG_FADE, limitChart } from './engine.js?v=0179fa5608';
+import { Soundtrack } from './audio.js?v=be0b905113';
 import { makeAudioChart, beatMap } from './beat-analysis.js?v=278b77f1d1';
 import { chooseLanguage, translate } from './i18n.js?v=d60e454469';
 import { SONGS } from './songs.js?v=9aab7fab42';
@@ -101,23 +101,29 @@ const bestKey=()=>`neon-rush-tap-hold-best-${track.id}-${difficulty}`;
 // and only moves scoring, so a finger that lands a little late still scores
 // while the notes and the beat flashes stay locked to the music.
 const clampSync=v=>Math.round(Math.max(SYNC_RANGE[0],Math.min(SYNC_RANGE[1],v))*1000)/1000;
+// A finger lands a little early or late, but never by much once taps carry
+// their own time; anything further off is the sound, which the sound delay fixes.
+const TAP_RANGE=[-.15,.15], clampTap=v=>Math.round(Math.max(TAP_RANGE[0],Math.min(TAP_RANGE[1],v))*1000)/1000;
 let tapDelay=0;
 try{
   localStorage.removeItem('vipermix-sound-delay');
   audio.offset=clampSync(Number(localStorage.getItem('vipermix-audio-delay'))||0);
-  tapDelay=clampSync(Number(localStorage.getItem('vipermix-tap-delay'))||0);
+  // Taps used to be timed when the page handled them, later than the finger
+  // landed, so a tap delay learned then is too large now; it starts afresh.
+  localStorage.removeItem('vipermix-tap-delay');
+  tapDelay=clampTap(Number(localStorage.getItem('vipermix-tap-lag'))||0);
 }catch{}
 function setSync(value){audio.offset=clampSync(value);try{localStorage.setItem('vipermix-audio-delay',String(audio.offset));}catch{}}
-function setTapDelay(value){tapDelay=clampSync(value);try{localStorage.setItem('vipermix-tap-delay',String(tapDelay));}catch{}}
-const tapTime=()=>audio.time-tapDelay;
+function setTapDelay(value){tapDelay=clampTap(value);try{localStorage.setItem('vipermix-tap-lag',String(tapDelay));}catch{}}
+// When the finger landed, in song time: from the event's own timestamp when it has a sensible one.
+const tapTime=stamp=>{const now=performance.now();return audio.timeAt(stamp>0&&stamp<=now&&now-stamp<250?stamp:now)-tapDelay;};
 const syncText=()=>t('soundDelayValue',{ms:Math.round(audio.offset*1000)});
 const syncRow=(test=false)=>`<div class="sync-row"><div><strong>${t('soundDelay')}</strong><small>${t('soundDelayHint')}</small></div><div class="sync-controls"><button class="sync-button" data-sync="-1" aria-label="${t('soundDelayLess')}">−</button><output role="status">${syncText()}</output><button class="sync-button" data-sync="1" aria-label="${t('soundDelayMore')}">+</button>${test?`<button class="sync-test" data-action="sync-test">${t('syncTest')}</button>`:''}</div></div>`;
 let syncSamples=[],sinceSync=0;
-// A tap near a note, scored or not, tells how late this player's taps land.
-function learnSync(lane,t){
-  let near=null;for(const n of run.notes)if(n.lane===lane&&(n.status==='pending'||n.status==='miss')&&Math.abs(t-n.time)<.4&&(!near||Math.abs(t-n.time)<Math.abs(t-near.time)))near=n;
-  if(!near)return;
-  syncSamples.push(t-near.time);if(syncSamples.length>16)syncSamples.shift();
+// A tap that hits a note tells how early or late this player's taps land.
+// Only hits count: a tap aimed at some other note would pull the delay off.
+function learnSync(error){
+  syncSamples.push(error);if(syncSamples.length>16)syncSamples.shift();
   if(++sinceSync<4)return;
   const step=syncStep(syncSamples);if(!step)return;
   const before=tapDelay;setTapDelay(before+step);const moved=tapDelay-before;
@@ -137,9 +143,9 @@ async function openSyncTest(){
   try{await audio.unlock();}catch{return;}
   if(dialogType==='sync'&&modal.open)audio.startClicks(SYNC_BEAT);
 }
-function syncTap(){
+function syncTap(stamp){
   if(!audio.clicking)return;
-  const heard=audio.time,error=heard-Math.round(heard/SYNC_BEAT)*SYNC_BEAT;syncFlash=1;
+  const heard=tapTime(stamp)+tapDelay,error=heard-Math.round(heard/SYNC_BEAT)*SYNC_BEAT;syncFlash=1;
   if(heard<-.2||Math.abs(error)>.25)return;
   syncTaps.push(error);if(syncTaps.length>12)syncTaps.shift();
   if(syncTaps.length>=6){const sorted=[...syncTaps].sort((a,b)=>a-b);setTapDelay((sorted[(sorted.length-1)>>1]+sorted[sorted.length>>1])/2);}
@@ -160,7 +166,7 @@ function drawSyncTest(){
   }
   g.globalAlpha=1;syncFlash=Math.max(0,syncFlash-.08);
 }
-$('#modalContent').addEventListener('pointerdown',e=>{if(e.target.classList.contains('sync-canvas')){e.preventDefault();syncTap();}});
+$('#modalContent').addEventListener('pointerdown',e=>{if(e.target.classList.contains('sync-canvas')){e.preventDefault();syncTap(e.timeStamp);}});
 function readBest(){try{return Number(localStorage.getItem(bestKey()))||0;}catch{return 0;}}
 function saveBest(score){try{localStorage.setItem(bestKey(),String(score));}catch{}}
 const format=n=>Math.round(n).toString().padStart(7,'0');
@@ -371,17 +377,17 @@ async function start(){
 }
 function showError(){showDialog('error');}
 function isLaneDown(lane){return keys.has(lane)||[...pointers.values()].some(p=>p.lane===lane);}
-function press(lane){
+function press(lane,stamp){
   if(mode!=='playing')return;
-  flashes[lane]=Math.max(flashes[lane],.7);flashColor[lane]=RGB['#79b8ff'];const t=tapTime();learnSync(lane,t);const n=run.candidate(lane,t);if(!n)return;
-  const rating=gradeTiming(t-n.time,run.windows);
+  flashes[lane]=Math.max(flashes[lane],.7);flashColor[lane]=RGB['#79b8ff'];const t=tapTime(stamp);const n=run.candidate(lane,t);if(!n)return;
+  const rating=gradeTiming(t-n.time,run.windows);learnSync(t-n.time);
   if(n.type==='hold'){n.status='holding';n.holdGrade=rating;n.error=t-n.time;burst(lane,'#c898ff');}
   else judge(n,rating,t-n.time);
 }
-function release(lane){
+function release(lane,stamp){
   if(mode!=='playing'||isLaneDown(lane))return;
   const n=run.notes.find(n=>n.lane===lane&&n.status==='holding');
-  if(n)judge(n,tapTime()>=n.time+n.duration-.22?n.holdGrade:'miss',n.error);
+  if(n)judge(n,tapTime(stamp)>=n.time+n.duration-.22?n.holdGrade:'miss',n.error);
 }
 // Lanes lean inward toward the top, so a touch picks the lane under the finger
 // on the drawn road rather than the straight column it falls in.
@@ -391,19 +397,19 @@ function laneAt(clientX,clientY){
 }
 $('#laneInputs').addEventListener('pointerdown',e=>{
   const button=e.target.closest('[data-lane]');if(!button||mode!=='playing')return;e.preventDefault();
-  const lane=laneAt(e.clientX,e.clientY);button.setPointerCapture(e.pointerId);pointers.set(e.pointerId,{lane});press(lane);
+  const lane=laneAt(e.clientX,e.clientY);button.setPointerCapture(e.pointerId);pointers.set(e.pointerId,{lane});press(lane,e.timeStamp);
 });
-function pointerEnd(e){const p=pointers.get(e.pointerId);if(p){pointers.delete(e.pointerId);release(p.lane);}}
+function pointerEnd(e){const p=pointers.get(e.pointerId);if(p){pointers.delete(e.pointerId);release(p.lane,e.timeStamp);}}
 $('#laneInputs').addEventListener('pointerup',pointerEnd);$('#laneInputs').addEventListener('pointercancel',pointerEnd);$('#laneInputs').addEventListener('lostpointercapture',pointerEnd);
 const keyLanes={KeyD:0,KeyF:1,KeyJ:2,KeyK:3};
 window.addEventListener('keydown',e=>{
   if(e.code==='Escape'){e.preventDefault();if(mode==='playing'||mode==='countdown')pause();else if(mode==='paused')resume();else if(modal.open)backDialog();return;}
   if(e.code==='Space'&&!modal.open&&!e.target.closest('button,a,input,select')){e.preventDefault();if(mode==='menu')trackMenu();return;}
-  if(dialogType==='sync'&&modal.open&&(e.code in keyLanes||e.code==='Space')){e.preventDefault();if(!e.repeat)syncTap();return;}
-  if(e.code in keyLanes){e.preventDefault();if(e.repeat)return;const l=keyLanes[e.code];keys.add(l);press(l);}
+  if(dialogType==='sync'&&modal.open&&(e.code in keyLanes||e.code==='Space')){e.preventDefault();if(!e.repeat)syncTap(e.timeStamp);return;}
+  if(e.code in keyLanes){e.preventDefault();if(e.repeat)return;const l=keyLanes[e.code];keys.add(l);press(l,e.timeStamp);}
 
 });
-window.addEventListener('keyup',e=>{if(e.code in keyLanes){const l=keyLanes[e.code];keys.delete(l);release(l);}});
+window.addEventListener('keyup',e=>{if(e.code in keyLanes){const l=keyLanes[e.code];keys.delete(l);release(l,e.timeStamp);}});
 async function pause(){
   if(mode!=='playing'&&mode!=='countdown')return;
   setMode('paused');keys.clear();pointers.clear();$('#countdown').hidden=true;$('#playingBars').classList.add('paused-bars');await audio.pause();

@@ -100,9 +100,9 @@ test('tap delay is caught up from taps, and stray taps move nothing',()=>{
   }
   assert.ok(Math.abs(offset-delay)<=.02,'caught up to '+offset);assert.ok(taps<=60,'took '+taps+' taps');
 });
-test('learned tap delay moves scoring only; the sound delay set by hand moves the notes',()=>{
+test('learned tap delay comes only from hits and moves scoring only; the sound delay set by hand moves the notes',()=>{
   const game=readFileSync(new URL('../dist/game.js',import.meta.url),'utf8'),audio=readFileSync(new URL('../dist/audio.js',import.meta.url),'utf8');
-  assert.match(game,/const t=tapTime\(\);learnSync\(lane,t\);const n=run\.candidate/);assert.match(game,/setTapDelay\(before\+step\)/);assert.doesNotMatch(game,/setSync\(before/);assert.match(game,/data-sync="-1"/);assert.match(audio,/-this\.offset-this\.startTime/);
+  assert.match(game,/const t=tapTime\(stamp\);const n=run\.candidate\(lane,t\);if\(!n\)return;\n  const rating=gradeTiming\(t-n\.time,run\.windows\);learnSync\(t-n\.time\);/);assert.match(game,/setTapDelay\(before\+step\)/);assert.doesNotMatch(game,/setSync\(before/);assert.match(game,/data-sync="-1"/);assert.match(audio,/-this\.offset-this\.startTime/);
 });
 test('every cheer reads in English and Chinese, and the stage has a place for it',async()=>{
   const {messages}=await import('../dist/i18n.js');

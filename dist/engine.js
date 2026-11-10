@@ -12,10 +12,9 @@ export const windowsFor = difficulty => difficulty === 'hard' ? HARD_WINDOWS : W
 export const SONG_LIMIT = 120, SONG_FADE = 3;
 export const limitChart = (notes, length) => notes.filter(n => n.time + (n.duration || 0) <= length - SONG_FADE / 2);
 // Tap delay: how late taps land on average, caught up while you play. Every
-// tap near a note (within .4 s, even too far off to score) is a sample; once
-// eight are in, the delay moves 60% of the way to their median, at most 30 ms
-// at a time, so a steady lag is caught up within a few bars and a single
-// stray tap moves nothing.
+// tap that hits a note is a sample; once eight are in, the delay moves 60% of
+// the way to their median, at most 30 ms at a time, so a steady lag is caught
+// up within a few bars and a single stray tap moves nothing.
 export const SYNC_RANGE = [-.25, .5];
 export function syncStep(samples) {
   if (samples.length < 8) return 0;

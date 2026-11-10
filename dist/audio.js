@@ -33,7 +33,7 @@ export class Soundtrack {
   }
   // A song longer than `length` seconds fades out over its last `fade` seconds and stops there.
   start(track, leadIn=0, length=Infinity, fade=0) {
-    this.stop(); this.track=track;this.beat=60/track.bpm;this.startTime=this.ctx.currentTime+.1+Math.max(leadIn,3*this.beat);this.step=0;
+    this.stop(); this.readings=[]; this.track=track;this.beat=60/track.bpm;this.startTime=this.ctx.currentTime+.1+Math.max(leadIn,3*this.beat);this.step=0;
     if(track.buffer){
       const source=this.own(this.ctx.createBufferSource()),gain=this.ctx.createGain();source.buffer=track.buffer;
       source.connect(gain).connect(this.master);source.start(this.startTime);
@@ -67,7 +67,25 @@ export class Soundtrack {
   // Not every browser reports that delay, so the player's own sound delay
   // (learned from their taps, or set by hand) is taken off as well.
   get latency(){const c=this.ctx;if(!c)return 0;const v=(Number(c.outputLatency)||0)+(Number(c.baseLatency)||0);return Math.min(.5,Math.max(0,v));}
-  get time(){return this.ctx?this.ctx.currentTime-this.latency-this.offset-this.startTime:0;}
+  get time(){const now=performance.now();return this.timeAt(now,now);}
+  // Song time at a moment on the page clock (performance.now(), which event
+  // timestamps share), so a tap counts from when the finger landed, not from
+  // when the page got round to it.
+  timeAt(stamp,now=performance.now()){return this.ctx?this.clockAt(stamp,now)-this.latency-this.offset-this.startTime:0;}
+  // The audio clock moves in uneven steps (coarse on iPhone), so it is tied to
+  // the page clock instead: each reading says how far the audio clock runs
+  // ahead of the page clock, and the furthest-ahead reading of the last half
+  // second is the one taken right after a step, the true lead. Between steps
+  // the clock then runs on smoothly with the page clock.
+  clockAt(stamp,now){
+    const c=this.ctx;
+    if(c.state!=='running'){this.readings=[];return c.currentTime;}
+    const readings=this.readings??=[],live=c.currentTime-now/1000;
+    if(!readings.length||now-readings.at(-1).at>=4)readings.push({at:now,lead:live});
+    while(now-readings[0].at>500)readings.shift();
+    const lead=Math.max(live,...readings.map(r=>r.lead));
+    return Math.min(stamp/1000+lead,c.currentTime+.05);
+  }
   // The sync test's metronome: a click every `every` seconds, a higher one each bar. The clock
   // starts at the first click, so `time` reads where the clicks are heard, as in a song.
   startClicks(every){
@@ -76,8 +94,8 @@ export class Soundtrack {
     ahead();this.timer=setInterval(ahead,25);
   }
   stopClicks(){if(this.clicking){this.clicking=false;this.stop();}}
-  async pause(){if(this.ctx?.state==='running')await this.ctx.suspend();}
-  async resume(){await this.unlock();this.schedule();}
+  async pause(){this.readings=[];if(this.ctx?.state==='running')await this.ctx.suspend();}
+  async resume(){this.readings=[];await this.unlock();this.schedule();}
   setMuted(value){this.muted=value;if(this.master)this.master.gain.setTargetAtTime(value?0:.6,this.ctx.currentTime,.02);}
   stop(){clearInterval(this.timer);this.timer=null;this.track=null;for(const n of this.nodes){try{n.stop();}catch{}}this.nodes.clear();}
 }
