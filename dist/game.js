@@ -2,7 +2,7 @@ import { TRACKS, makeChart, trackMap, gradeTiming, gradeAccuracy, Run, syncStep,
 import { Soundtrack } from './audio.js?v=be0b905113';
 import { makeAudioChart, beatMap } from './beat-analysis.js?v=278b77f1d1';
 import { chooseLanguage, translate } from './i18n.js?v=d60e454469';
-import { SONGS } from './songs.js?v=9aab7fab42';
+import { SONGS } from './songs.js?v=f1e1f0bb18';
 
 const $ = s => document.querySelector(s);
 const canvas=$('#canvas'), stage=$('#stage'), modal=$('#modal');

@@ -16,6 +16,8 @@ const SONGS=[
   {id:'mohicans',title:'Mohicans',file:'mohicans.mp3'},
   {id:'da-huo-ji',title:'打火机',file:'da-huo-ji.mp3'},
   {id:'wo-shi-fen-nu',title:'我是愤怒',file:'wo-shi-fen-nu.mp3'},
+  {id:'abcdefu',title:'Abcdefu',file:'abcdefu.mp3'},
+  {id:'ren-yu-de-yan-lei',title:'人鱼的眼泪',file:'ren-yu-de-yan-lei.mp3'},
 ];
 const dist=new URL('../dist/',import.meta.url), source=44100, rate=11025;
 const out=SONGS.map(song=>{
