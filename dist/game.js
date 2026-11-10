@@ -1,7 +1,7 @@
 import { TRACKS, makeChart, trackMap, gradeTiming, gradeAccuracy, Run, syncStep, SYNC_RANGE, SONG_LIMIT, SONG_FADE, limitChart } from './engine.js?v=0179fa5608';
-import { Soundtrack } from './audio.js?v=be0b905113';
+import { Soundtrack } from './audio.js?v=71f0749461';
 import { makeAudioChart, beatMap } from './beat-analysis.js?v=ba5a5c5fde';
-import { chooseLanguage, translate } from './i18n.js?v=d60e454469';
+import { chooseLanguage, translate } from './i18n.js?v=b92f29ccaf';
 import { SONGS } from './songs.js?v=efe64b43a1';
 
 const $ = s => document.querySelector(s);
@@ -35,11 +35,33 @@ function songCard(item){
 function songMenuContent(){
   return `<h2>${t('chooseTrack')}</h2><p class="setup-intro">${t('chooseTrackHint')}</p><div class="song-grid">${builtInTracks.map(songCard).join('')}</div>`;
 }
+// Picking a song plays its preview while the difficulty is chosen: from the
+// loudest 20 seconds of a recorded song (a quiet intro is skipped), starting on a bar,
+// from the start of an original track. The button stops and restarts it.
+const PREVIEW_LENGTH=20;
+let previewOn=true;
+function previewStart(item){
+  if(!item.recorded)return 0;
+  if(item.previewAt===undefined){
+    const {beats,downbeat}=beatMap(item.analysis), {waveform,duration:length}=item.analysis, last=Math.max(0,Math.min(SONG_LIMIT,item.duration)-SONG_FADE-PREVIEW_LENGTH);
+    const loudness=from=>{let sum=0,count=0;waveform.forEach((level,i)=>{const time=(i+.5)*length/waveform.length;if(time>=from&&time<from+PREVIEW_LENGTH){sum+=level;count++;}});return count?sum/count:0;};
+    const starts=beats.filter((time,k)=>((k-downbeat)%4+4)%4===0&&time<=last).map(time=>({time,loud:loudness(time)}));
+    const top=Math.max(0,...starts.map(s=>s.loud));
+    // The earliest bar whose 20 seconds are (nearly) the loudest in the song.
+    item.previewAt=starts.find(s=>s.loud>=top*.97)?.time??0;
+  }
+  return item.previewAt;
+}
+function playPreview(){
+  const item=track;if(!previewOn||audio.previewTrack===item)return;
+  audio.unlock().then(()=>prepare(item)).then(()=>{if(previewOn&&modal.open&&dialogType==='difficulty'&&track===item&&audio.previewTrack!==item)audio.preview(item,previewStart(item),PREVIEW_LENGTH);}).catch(()=>{});
+}
+const previewButton=()=>`<button class="preview-toggle ${previewOn?'on':''}" data-action="preview" aria-pressed="${previewOn}" aria-label="${t(previewOn?'stopPreview':'playPreview')}"><span class="playing-bars" aria-hidden="true"><i></i><i></i><i></i><i></i></span>${t('preview')}</button>`;
 // Paused, a different difficulty starts the song again with that difficulty's notes.
 const pauseDifficulty=()=>`<p class="pause-label">${t('changeDifficulty')}</p><div class="difficulty-selector" role="group" aria-label="${t('difficulty')}">`+['easy','normal','hard'].map(value=>`<button class="${value===difficulty?'selected':''}" data-difficulty="${value}" aria-pressed="${value===difficulty}">${t(value)}</button>`).join('')+`</div>`;
 function difficultyContent(){
   const notes=track.recorded?makeAudioChart(track.analysis,difficulty):makeChart(track,difficulty);
-  return `<h2>${t('chooseDifficulty')}</h2><div class="selected-track"><span class="song-symbol" aria-hidden="true">♫</span><div><small>${t('selectedSong')}</small><strong>${escapeHtml(trackTitle(track))}</strong><span>${songFacts(track,duration())}</span></div></div><div class="difficulty-cards" role="group" aria-label="${t('difficulty')}">`+['easy','normal','hard'].map((value,i)=>`<button class="difficulty-card ${value===difficulty?'selected':''}" data-difficulty="${value}" aria-pressed="${value===difficulty}"><span class="difficulty-bars" aria-hidden="true">${[0,1,2].map(n=>`<i class="${n<=i?'lit':''}"></i>`).join('')}</span><strong>${t(value)}</strong><small>${t(value+'Hint')}</small></button>`).join('')+`</div><div class="setup-summary" role="status"><span>${t('noteCount',{count:notes.length})}</span><span>${t(difficulty==='easy'?'noFail':'tapHold')}</span></div><div class="setup-extras"><p class="setup-tune">${t('followsTune')}</p>${syncRow(true)}</div>${track.recorded&&track.analysis.weakBeat?`<p class="setup-warning">${t('weakBeat')}</p>`:''}<button class="primary-button setup-start" data-action="start-game"><span aria-hidden="true">▶</span>${t('startGame')}</button>`;
+  return `<h2>${t('chooseDifficulty')}</h2><div class="selected-track"><span class="song-symbol" aria-hidden="true">♫</span><div><small>${t('selectedSong')}</small><strong>${escapeHtml(trackTitle(track))}</strong><span>${songFacts(track,duration())}</span></div>${previewButton()}</div><div class="difficulty-cards" role="group" aria-label="${t('difficulty')}">`+['easy','normal','hard'].map((value,i)=>`<button class="difficulty-card ${value===difficulty?'selected':''}" data-difficulty="${value}" aria-pressed="${value===difficulty}"><span class="difficulty-bars" aria-hidden="true">${[0,1,2].map(n=>`<i class="${n<=i?'lit':''}"></i>`).join('')}</span><strong>${t(value)}</strong><small>${t(value+'Hint')}</small></button>`).join('')+`</div><div class="setup-summary" role="status"><span>${t('noteCount',{count:notes.length})}</span><span>${t(difficulty==='easy'?'noFail':'tapHold')}</span></div><div class="setup-extras"><p class="setup-tune">${t('followsTune')}</p>${syncRow(true)}</div>${track.recorded&&track.analysis.weakBeat?`<p class="setup-warning">${t('weakBeat')}</p>`:''}<button class="primary-button setup-start" data-action="start-game"><span aria-hidden="true">▶</span>${t('startGame')}</button>`;
 }
 
 function updateLanguageButtons(){
@@ -436,10 +458,10 @@ function finish(reason='complete'){
   const shown=session;setTimeout(()=>{if(mode==='results'&&session===shown)goHome();},RESULT_TIME*1000);
 }
 function closeModal(){
-  audio.stopClicks();
+  audio.stopClicks();audio.stopPreview();
   if(modal.open)modal.close();dialogType='';
 }
-function showDialog(type){if(type!=='sync')audio.stopClicks();dialogType=type;renderDialog();if(!modal.open)modal.showModal();}
+function showDialog(type){if(type!=='sync')audio.stopClicks();if(type!=='difficulty')audio.stopPreview();dialogType=type;renderDialog();if(!modal.open)modal.showModal();if(type==='difficulty')playPreview();}
 function help(){showDialog('help');}
 function trackMenu(){if(mode==='menu')showDialog('tracks');}
 // The song list is home: leaving a game lands there, and leaving the song
@@ -480,6 +502,7 @@ $('#modalContent').addEventListener('click',e=>{
   const action=e.target.closest('[data-action]')?.dataset.action;
   if(action==='start-game'&&dialogType==='difficulty')start();
   if(action==='back-songs')backToSongs();
+  if(action==='preview'&&dialogType==='difficulty'){previewOn=!previewOn;if(previewOn)playPreview();else audio.stopPreview();e.target.closest('[data-action]').outerHTML=previewButton();$('.preview-toggle').focus();return;}
   if(action==='sync-test')openSyncTest();if(action==='sync-done')showDialog('difficulty');
   if(action==='close')dismiss();if(action==='resume')resume();if(action==='restart')start();if(action==='home')goHome();
   const id=e.target.closest('[data-track]')?.dataset.track;
@@ -508,7 +531,7 @@ document.body.classList.add('at-start');$('#startButton').addEventListener('clic
 $('#pauseButton').addEventListener('click',pause);$('#helpButton').addEventListener('click',help);$('#trackButton').addEventListener('click',trackMenu);
 $('#soundButton').addEventListener('click',()=>{audio.setMuted(!audio.muted);syncSoundLabel();$('#soundButton').style.color=audio.muted?'#ff7b9f':'';$('#soundButton').innerHTML=audio.muted?'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m11 5-6 4H2v6h3l6 4zM16 9l6 6M22 9l-6 6"/></svg>':'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m11 5-6 4H2v6h3l6 4zM15 8a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14"/></svg>';});
 $('#fullscreenButton').addEventListener('click',async()=>{if(!document.fullscreenElement)return enterFullscreen();try{await document.exitFullscreen();screen.orientation?.unlock?.();}catch{}});
-document.addEventListener('visibilitychange',()=>{if(document.hidden)pause();});window.addEventListener('blur',()=>{if(mode==='playing'||mode==='countdown')pause();});
+document.addEventListener('visibilitychange',()=>{if(document.hidden){pause();audio.stopPreview();}else if(dialogType==='difficulty'&&modal.open)playPreview();});window.addEventListener('blur',()=>{if(mode==='playing'||mode==='countdown')pause();});
 
 function frame(now){
   const dt=mode==='paused'?0:Math.min(.05,(now-lastFrame)/1000||.016);lastFrame=now;visualTime+=dt;

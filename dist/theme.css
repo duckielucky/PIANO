@@ -200,3 +200,14 @@ dialog[data-dialog="sync"] .sync-row{margin-bottom:12px}
 dialog .pause-label{margin:0 0 7px;font-size:10px;letter-spacing:.6px;color:#bba6d3;text-align:center}
 dialog .difficulty-selector{margin-bottom:6px}
 dialog .difficulty-selector button{min-height:38px;font-size:11px;letter-spacing:1px}
+
+/* Song preview on the difficulty screen */
+.selected-track>div{flex:1}
+.preview-toggle{flex-shrink:0;display:flex;align-items:center;gap:6px;border:1px solid #ac88ff40;background:#9c5af71f;color:#e3d4fb;border-radius:999px;padding:7px 11px;font-size:9px;font-weight:700;letter-spacing:1px}
+.preview-toggle:hover{background:#9c5af733}
+.preview-toggle:not(.on){color:#a996c1;border-color:#ac88ff22;background:transparent}
+.preview-toggle .playing-bars{height:12px;gap:2px}
+.preview-toggle .playing-bars i{width:2px;height:10px}
+.preview-toggle .playing-bars i:nth-child(2){height:12px}
+.preview-toggle .playing-bars i:nth-child(3){height:7px}
+.preview-toggle:not(.on) .playing-bars i{animation:none;transform:scaleY(.35);background:#a996c1}

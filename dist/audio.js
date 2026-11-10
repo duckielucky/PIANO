@@ -93,9 +93,27 @@ export class Soundtrack {
     const ahead=()=>{while(this.startTime+next*every<this.ctx.currentTime+.2){this.tone(next%4?1000:1500,this.startTime+next*every,.06,'sine',.3);next++;}};
     ahead();this.timer=setInterval(ahead,25);
   }
+  // A song's preview while the player picks a difficulty: `length` seconds from
+  // `from`, faded in and out, played again until stopped. Original tracks
+  // play from their start.
+  preview(track, from=0, length=20){
+    this.stop();const id=this.previewing={track};
+    const play=()=>{
+      if(this.previewing!==id)return;
+      if(!track.buffer){this.start(track,0);this.previewing=id;this.previewTimer=setTimeout(()=>{if(this.previewing!==id)return;this.stop();this.previewing=id;play();},length*1000);return;}
+      const t=this.ctx.currentTime+.05,source=this.own(this.ctx.createBufferSource()),gain=this.ctx.createGain(),end=Math.min(length,track.buffer.duration-from);
+      source.buffer=track.buffer;source.connect(gain).connect(this.master);
+      gain.gain.setValueAtTime(0,t);gain.gain.linearRampToValueAtTime(1,t+.6);gain.gain.setValueAtTime(1,t+end-1.5);gain.gain.linearRampToValueAtTime(0,t+end);
+      source.start(t,from,end);
+      const done=source.onended;source.onended=()=>{done();if(this.previewing===id)play();};
+    };
+    play();
+  }
+  get previewTrack(){return this.previewing?.track??null;}
+  stopPreview(){if(this.previewing)this.stop();}
   stopClicks(){if(this.clicking){this.clicking=false;this.stop();}}
   async pause(){this.readings=[];if(this.ctx?.state==='running')await this.ctx.suspend();}
   async resume(){this.readings=[];await this.unlock();this.schedule();}
   setMuted(value){this.muted=value;if(this.master)this.master.gain.setTargetAtTime(value?0:.6,this.ctx.currentTime,.02);}
-  stop(){clearInterval(this.timer);this.timer=null;this.track=null;for(const n of this.nodes){try{n.stop();}catch{}}this.nodes.clear();}
+  stop(){clearInterval(this.timer);clearTimeout(this.previewTimer);this.timer=null;this.track=null;this.previewing=null;for(const n of this.nodes){try{n.stop();}catch{}}this.nodes.clear();}
 }
