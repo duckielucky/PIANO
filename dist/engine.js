@@ -7,6 +7,10 @@ export const WINDOWS = { perfect: .09, great: .16, good: .24, miss: .27 };
 // Hard judges tighter: a note has to land closer to the beat to count at all.
 export const HARD_WINDOWS = { perfect: .06, great: .11, good: .17, miss: .2 };
 export const windowsFor = difficulty => difficulty === 'hard' ? HARD_WINDOWS : WINDOWS;
+// A round lasts two minutes at most: a longer song fades out over the last
+// three seconds, and its notes stop before the music is too quiet to follow.
+export const SONG_LIMIT = 120, SONG_FADE = 3;
+export const limitChart = (notes, length) => notes.filter(n => n.time + (n.duration || 0) <= length - SONG_FADE / 2);
 // Tap delay: how late taps land on average, caught up while you play. Every
 // tap near a note (within .4 s, even too far off to score) is a sample; once
 // eight are in, the delay moves 60% of the way to their median, at most 30 ms

@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {analyzePcm,makeAudioChart,beatMap,spectralFlux,ANALYSIS_VERSION} from '../dist/beat-analysis.js';
+import {SONG_LIMIT} from '../dist/engine.js';
 // Playable on a phone: lanes in range, nothing past the end, no lane reused within
 // .18 s of its last note ending, at most two lanes at once (never on Chill), and
 // notes cleared before the next one starts.
@@ -192,8 +193,9 @@ test('stereo shares one FFT but each channel is still heard on its own',()=>{
 
 test('songs that ship with the game have their audio, a current analysis, and playable charts',async()=>{
   const {SONGS}=await import('../dist/songs.js');const {createHash}=await import('node:crypto');
-  assert.ok(SONGS.length>=1);
+  assert.ok(SONGS.length>=1);assert.equal(new Set(SONGS.map(song=>song.id)).size,SONGS.length,'song ids are unique');
   for(const song of SONGS){
+    assert.ok(song.duration<=SONG_LIMIT+.05,song.id+' is longer than a round');
     const [file,tag]=song.file.split('?v=');
     assert.equal(tag,createHash('sha1').update(readFileSync(new URL('../dist/'+file,import.meta.url))).digest('hex').slice(0,10),song.id+' audio changed; run node scripts/bundle-songs.mjs');
     assert.equal(song.analysis.version,ANALYSIS_VERSION,song.id+' analysed by an older version; run node scripts/bundle-songs.mjs');

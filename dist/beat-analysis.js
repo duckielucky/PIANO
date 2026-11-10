@@ -350,7 +350,7 @@ export function beatMap(analysis){
 
 // How each difficulty fills a beat at each level: [play every n-th beat, notes per beat].
 const PLAN={easy:[[4,1],[2,1],[1,1]],normal:[[2,1],[1,1],[1,2]],hard:[[1,2],[1,4],[1,4]]};
-const GAP={easy:.45,normal:.2,hard:.09};
+const GAP={easy:.45,normal:.2,hard:.1};
 
 export function makeAudioChart(analysis,difficulty='easy'){
   const map=beatMap(analysis), {beat,beats,levels,downbeat}=map, events=analysis.events||[], near=nearFinder(events);

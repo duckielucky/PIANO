@@ -31,11 +31,14 @@ export class Soundtrack {
     gain.gain.setValueAtTime(volume,time);gain.gain.exponentialRampToValueAtTime(.0001,time+duration);
     src.connect(filter).connect(gain).connect(this.master);src.start(time);src.stop(time+duration);
   }
-  start(track, leadIn=0) {
+  // A song longer than `length` seconds fades out over its last `fade` seconds and stops there.
+  start(track, leadIn=0, length=Infinity, fade=0) {
     this.stop(); this.track=track;this.beat=60/track.bpm;this.startTime=this.ctx.currentTime+.1+Math.max(leadIn,3*this.beat);this.step=0;
     if(track.buffer){
-      const source=this.own(this.ctx.createBufferSource());source.buffer=track.buffer;
-      source.connect(this.master);source.start(this.startTime);return;
+      const source=this.own(this.ctx.createBufferSource()),gain=this.ctx.createGain();source.buffer=track.buffer;
+      source.connect(gain).connect(this.master);source.start(this.startTime);
+      if(track.buffer.duration>length){const end=this.startTime+length;gain.gain.setValueAtTime(1,end-fade);gain.gain.linearRampToValueAtTime(0,end);source.stop(end);}
+      return;
     }
     this.schedule(); this.timer=setInterval(()=>this.schedule(),25);
   }

@@ -8,7 +8,15 @@ import {execFileSync} from 'node:child_process';
 import {readFileSync,writeFileSync} from 'node:fs';
 import {createHash} from 'node:crypto';
 import {analyzePcm} from '../dist/beat-analysis.js';
-const SONGS=[{id:'not-like-us',title:'Not Like Us',file:'not-like-us.mp3'}];
+// The VIPERMIX remixes are their first two minutes, faded out over the last 3 s.
+const SONGS=[
+  {id:'not-like-us',title:'Not Like Us',file:'not-like-us.mp3'},
+  {id:'leslie-bu-zhi-de-ai',title:'不值得爱吗 说散就散',file:'leslie-bu-zhi-de-ai.mp3'},
+  {id:'awan-nano',title:'Awan Nano',file:'awan-nano.mp3'},
+  {id:'mohicans',title:'Mohicans',file:'mohicans.mp3'},
+  {id:'da-huo-ji',title:'打火机',file:'da-huo-ji.mp3'},
+  {id:'wo-shi-fen-nu',title:'我是愤怒',file:'wo-shi-fen-nu.mp3'},
+];
 const dist=new URL('../dist/',import.meta.url), source=44100, rate=11025;
 const out=SONGS.map(song=>{
   const path=new URL(song.file,dist).pathname;

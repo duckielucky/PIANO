@@ -245,3 +245,6 @@ dialog[data-dialog="pause"] .sync-row+.sync-row{margin-top:-4px}
 .sync-taps{display:block;min-height:18px;margin:8px 0 2px;color:#e9defa;font-size:12px;text-align:center}
 dialog[data-dialog="sync"] .sync-row{margin-bottom:12px}
 @media(orientation:landscape) and (max-height:540px){.sync-canvas{height:96px}.sync-intro{margin:2px 0 6px;font-size:11px}}
+/* Results: a bar runs down for the three seconds before the song list comes back. */
+.result-timer{height:3px;margin-top:14px;border-radius:3px;background:var(--brand-gradient);transform-origin:left;animation:result-timer linear forwards}
+@keyframes result-timer{to{transform:scaleX(0)}}

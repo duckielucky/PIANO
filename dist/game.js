@@ -1,10 +1,10 @@
-import { TRACKS, makeChart, trackMap, gradeTiming, gradeAccuracy, Run, syncStep, SYNC_RANGE } from './engine.js?v=61f3a7b7e0';
-import { Soundtrack } from './audio.js?v=0de730cf2c';
-import { makeAudioChart, beatMap, ANALYSIS_VERSION } from './beat-analysis.js?v=45599a3e48';
-import { importSong } from './song-import.js?v=52be8e49a5';
+import { TRACKS, makeChart, trackMap, gradeTiming, gradeAccuracy, Run, syncStep, SYNC_RANGE, SONG_LIMIT, SONG_FADE, limitChart } from './engine.js?v=68d9b3f2fb';
+import { Soundtrack } from './audio.js?v=90cd7f608e';
+import { makeAudioChart, beatMap, ANALYSIS_VERSION } from './beat-analysis.js?v=43edfa5b03';
+import { importSong } from './song-import.js?v=24d1eefb99';
 import { listSongs, saveSong, deleteSong, MAX_SONGS } from './song-library.js?v=8ebd178751';
 import { chooseLanguage, translate } from './i18n.js?v=9d99bcf74e';
-import { SONGS } from './songs.js?v=38c9846876';
+import { SONGS } from './songs.js?v=9aab7fab42';
 
 const $ = s => document.querySelector(s);
 const canvas=$('#canvas'), stage=$('#stage'), modal=$('#modal');
@@ -89,7 +89,7 @@ function importContent(){
   return `<div class="analysis-orbit" aria-hidden="true">♫</div><h2>${t(status)}</h2>${name}<progress class="analysis-progress" ${progress===null?'':`value="${progress}"`} max="100" aria-label="${t(status)}"></progress><p class="import-hint" role="status">${progress===null?t('decoding'):t('analyzing')+' '+progress+'%'}</p><button class="secondary-button" data-action="back-songs">${t('cancel')}</button>`;
 }
 function songCard(item){
-  const card=`<button class="track-choice song-card ${item===track?'selected':''}" data-track="${item.id}" aria-pressed="${item===track}"><span class="song-symbol" aria-hidden="true">♫</span><span class="song-copy"><strong>${escapeHtml(trackTitle(item))}</strong><small>${songFacts(item,item.duration??item.bars*4*60/item.bpm)}${item.uploaded&&!item.saved?' · '+t('notSaved'):''}</small></span><span class="song-chevron" aria-hidden="true">→</span></button>`;
+  const card=`<button class="track-choice song-card ${item===track?'selected':''}" data-track="${item.id}" aria-pressed="${item===track}"><span class="song-symbol" aria-hidden="true">♫</span><span class="song-copy"><strong>${escapeHtml(trackTitle(item))}</strong><small>${songFacts(item,Math.min(SONG_LIMIT,item.duration??item.bars*4*60/item.bpm))}${item.uploaded&&!item.saved?' · '+t('notSaved'):''}</small></span><span class="song-chevron" aria-hidden="true">→</span></button>`;
   if(!item.uploaded||item.bundled)return card;
   const confirm=removing===item.id;
   return `<div class="song-item">${card}<button class="song-remove ${confirm?'confirm':''}" data-remove="${item.id}" aria-label="${escapeHtml(t('removeSong',{title:item.title}))}">${confirm?t('confirmRemove'):'✕'}</button></div>`;
@@ -160,7 +160,7 @@ function beatAt(grid,t){
   while(lo<hi){const mid=(lo+hi+1)>>1;if(grid.beats[mid]<=t)lo=mid;else hi=mid-1;}
   return {k:lo,since:t-grid.beats[lo],level:grid.levels[lo],bar:((lo-grid.downbeat)%4+4)%4===0};
 }
-const duration=()=>track.duration??track.bars*4*60/track.bpm;
+const duration=()=>Math.min(SONG_LIMIT,track.duration??track.bars*4*60/track.bpm);
 const bestKey=()=>`neon-rush-tap-hold-best-${track.id}-${difficulty}`;
 // Two delays, both kept on this device. The sound delay (set with − and +)
 // moves the notes and the beat to where the sound is heard, for Bluetooth and
@@ -433,8 +433,8 @@ async function start(){
   const token=++session; closeModal();
   try{await audio.unlock();await prepare(track);}catch(e){showError();return;}
   if(token!==session)return;
-  run=new Run(track.uploaded?makeAudioChart(track.analysis,difficulty):makeChart(track,difficulty),difficulty);syncSamples=[];sinceSync=0;cheerUntil=cheerRank=0;perfectRun=missRun=lastLevel=0;lowEnergy=false;$('#cheer').classList.remove('show');lastScore=lastCombo=lastEnergy=-1;keys.clear();pointers.clear();particles=[];ripples=[];flares=[];missFlashes=[0,0,0,0];lastCountdown=null;
-  audio.start(track,track.uploaded?travel()+.35:0);setMode('countdown');$('#pauseButton').disabled=false;$('#nextTrack').hidden=true;$('#trackButton').disabled=true;$('#playingBars').hidden=false;$('#countdown').hidden=false;$('#songProgress').style.width='0%';updateHUD();
+  run=new Run(limitChart(track.uploaded?makeAudioChart(track.analysis,difficulty):makeChart(track,difficulty),duration()),difficulty);syncSamples=[];sinceSync=0;cheerUntil=cheerRank=0;perfectRun=missRun=lastLevel=0;lowEnergy=false;$('#cheer').classList.remove('show');lastScore=lastCombo=lastEnergy=-1;keys.clear();pointers.clear();particles=[];ripples=[];flares=[];missFlashes=[0,0,0,0];lastCountdown=null;
+  audio.start(track,track.uploaded?travel()+.35:0,duration(),SONG_FADE);setMode('countdown');$('#pauseButton').disabled=false;$('#nextTrack').hidden=true;$('#trackButton').disabled=true;$('#playingBars').hidden=false;$('#countdown').hidden=false;$('#songProgress').style.width='0%';updateHUD();
 }
 function showError(){showDialog('error');}
 function isLaneDown(lane){return keys.has(lane)||[...pointers.values()].some(p=>p.lane===lane);}
@@ -487,11 +487,14 @@ function goHome(){
   session++;audio.stop();closeModal();setMode('menu');run=null;keys.clear();pointers.clear();$('#countdown').hidden=true;$('#comboBox').classList.remove('visible');$('#judgment').classList.remove('show');$('#pauseButton').disabled=true;$('#nextTrack').hidden=false;$('#trackButton').disabled=false;$('#playingBars').hidden=true;$('#playingBars').classList.remove('paused-bars');$('#score').textContent='0000000';$('#energyFill').style.width='100%';$('#energyFill').style.background='var(--brand-gradient)';$('#judgment').textContent='';delete $('#judgment').dataset.result;$('#energyText').textContent='100%';$('#songProgress').style.width='0%';$('#best').textContent=format(readBest());
   trackMenu();
 }
+const RESULT_TIME=3;
 function finish(reason='complete'){
   if(mode==='results')return;setMode('results');audio.stop();$('#pauseButton').disabled=true;$('#playingBars').hidden=true;$('#comboBox').classList.remove('visible');
   const prev=readBest(),newBest=run.score>prev;if(newBest)saveBest(run.score);$('#best').textContent=format(readBest());
   const accuracy=run.accuracy,grade=gradeAccuracy(accuracy);
   lastResult={reason,newBest,accuracy,grade};showDialog('results');
+  // The result stays up for three seconds, then the song list comes back; Play again still works meanwhile.
+  const shown=session;setTimeout(()=>{if(mode==='results'&&session===shown)goHome();},RESULT_TIME*1000);
 }
 function closeModal(){
   audio.stopClicks();
@@ -529,7 +532,7 @@ function renderDialog(){
   if(dialogType==='sync')content=`<h2>${t('syncTitle')}</h2><p class="sync-intro">${t('syncIntro')}</p><canvas class="sync-canvas" role="button" aria-label="${t('syncCanvas')}"></canvas><output class="sync-taps" role="status">${syncTapText()}</output>${syncRow()}<button class="primary-button" data-action="sync-done">${t('done')}</button>`;
   if(dialogType==='results'&&lastResult){
     const {reason,newBest,accuracy,grade}=lastResult;
-    content=`<div class="eyebrow">${t(reason==='complete'?'complete':'outOfEnergy')}</div><h2>${t(reason==='complete'?'niceFlow':'tryAgain')}</h2><div class="result-grade">${grade}</div><div class="result-score">${format(run.score)}</div><div class="result-best">${newBest?'↗ '+t('newBest'):escapeHtml(trackTitle(track))}</div><div class="result-stats"><div><strong>${accuracy.toFixed(1)}%</strong><span>${t('accuracy')}</span></div><div><strong>${run.maxCombo}</strong><span>${t('maxCombo')}</span></div></div><div class="result-breakdown"><span>${run.counts.perfect} ${t('perfect')}</span><span>${run.counts.great+run.counts.good} ${t('goodGreat')}</span><span>${run.counts.miss} ${t('miss')}</span></div><button class="primary-button" data-action="restart">${t('playAgain')} <span>↗</span></button><button class="secondary-button" data-action="back-songs">${t('changeTrackAction')}</button>`;
+    content=`<div class="eyebrow">${t(reason==='complete'?'complete':'outOfEnergy')}</div><h2>${t(reason==='complete'?'niceFlow':'tryAgain')}</h2><div class="result-grade">${grade}</div><div class="result-score">${format(run.score)}</div><div class="result-best">${newBest?'↗ '+t('newBest'):escapeHtml(trackTitle(track))}</div><div class="result-stats"><div><strong>${accuracy.toFixed(1)}%</strong><span>${t('accuracy')}</span></div><div><strong>${run.maxCombo}</strong><span>${t('maxCombo')}</span></div></div><div class="result-breakdown"><span>${run.counts.perfect} ${t('perfect')}</span><span>${run.counts.great+run.counts.good} ${t('goodGreat')}</span><span>${run.counts.miss} ${t('miss')}</span></div><button class="primary-button" data-action="restart">${t('playAgain')} <span>↗</span></button><button class="secondary-button" data-action="back-songs">${t('changeTrackAction')}</button><div class="result-timer" style="animation-duration:${RESULT_TIME}s" aria-hidden="true"></div>`;
   }
   const setup=dialogType==='tracks'||dialogType==='difficulty';
   const toolbar=setup?`<div class="setup-toolbar"><button class="setup-back" data-action="${dialogType==='tracks'?'close':'back-songs'}">← ${t('back')}</button><nav class="setup-steps" aria-label="${t('setupProgress')}"><span ${dialogType==='tracks'?'aria-current="step"':''}>${t('songStep')}</span><i aria-hidden="true">/</i><span ${dialogType==='difficulty'?'aria-current="step"':''}>${t('difficultyStep')}</span></nav><button class="language-button" data-language-toggle></button></div>`:`<div class="dialog-language"><button class="language-button" data-language-toggle></button></div>`;

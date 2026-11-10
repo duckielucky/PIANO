@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { TRACKS, MELODY, melodyNote, makeChart, songSection, gradeTiming, Run, syncStep, SYNC_RANGE, HARD_WINDOWS } from '../dist/engine.js';
+import { TRACKS, MELODY, melodyNote, makeChart, songSection, gradeTiming, Run, syncStep, SYNC_RANGE, HARD_WINDOWS, SONG_LIMIT, SONG_FADE, limitChart } from '../dist/engine.js';
 test('timing windows are symmetric and reject off-beat taps',()=>{
   assert.equal(gradeTiming(.07),'perfect');assert.equal(gradeTiming(-.13),'great');assert.equal(gradeTiming(.22),'good');assert.equal(gradeTiming(.28),null);assert.equal(gradeTiming(-.28),null);
 });
@@ -127,4 +127,11 @@ test('every element the game looks up by id is on the page',()=>{
   const ids=new Set([...html.matchAll(/id="([\w-]+)"/g)].map(m=>m[1])),wanted=[...new Set([...game.matchAll(/\$\('#([\w-]+)'\)/g)].map(m=>m[1]))];
   assert.ok(wanted.length>15);
   for(const id of wanted)assert.ok(ids.has(id),'#'+id+' is missing from index.html');
+});
+test('a round stops at two minutes: no note ends inside the final fade',()=>{
+  const notes=[{time:10,lane:0},{time:118,lane:1},{time:119,lane:2},{time:117,lane:3,duration:2},{time:130,lane:0}];
+  const kept=limitChart(notes,SONG_LIMIT);
+  assert.deepEqual(kept.map(n=>n.time),[10,118]);
+  assert.ok(kept.every(n=>n.time+(n.duration||0)<=SONG_LIMIT-SONG_FADE/2));
+  assert.equal(limitChart(notes,60).length,1);
 });
