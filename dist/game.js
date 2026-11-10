@@ -1,7 +1,7 @@
 import { TRACKS, makeChart, trackMap, gradeTiming, gradeAccuracy, Run, syncStep, SYNC_RANGE, SONG_LIMIT, SONG_FADE, limitChart } from './engine.js?v=68d9b3f2fb';
 import { Soundtrack } from './audio.js?v=90cd7f608e';
-import { makeAudioChart, beatMap, ANALYSIS_VERSION } from './beat-analysis.js?v=43edfa5b03';
-import { importSong } from './song-import.js?v=24d1eefb99';
+import { makeAudioChart, beatMap, ANALYSIS_VERSION } from './beat-analysis.js?v=278b77f1d1';
+import { importSong } from './song-import.js?v=507ca187e5';
 import { listSongs, saveSong, deleteSong, MAX_SONGS } from './song-library.js?v=8ebd178751';
 import { chooseLanguage, translate } from './i18n.js?v=9d99bcf74e';
 import { SONGS } from './songs.js?v=9aab7fab42';

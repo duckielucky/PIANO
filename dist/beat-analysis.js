@@ -349,6 +349,7 @@ export function beatMap(analysis){
 }
 
 // How each difficulty fills a beat at each level: [play every n-th beat, notes per beat].
+// Easy doubles the spacing when the beats come faster than it allows, so it keeps a steady pulse.
 const PLAN={easy:[[4,1],[2,1],[1,1]],normal:[[2,1],[1,1],[1,2]],hard:[[1,2],[1,4],[1,4]]};
 const GAP={easy:.45,normal:.2,hard:.1};
 
@@ -358,22 +359,25 @@ export function makeAudioChart(analysis,difficulty='easy'){
   const strengths=events.map(e=>e.strength).sort((a,b)=>a-b), strong=p=>strengths[Math.floor(p*(strengths.length-1))]??0;
   const accent=strong(.5), sharp=strong(.6), end=analysis.duration-.25;
   const window=Math.max(.04,Math.min(.07,beat*.12)), heard=beats.map(time=>!!near(time,window));
-  // Steady: at least three of the four beats around this one have their own attack.
+  // The beat is really there: at least three of the four beats around this one have their own attack.
   const steady=k=>[k-2,k-1,k+1,k+2].filter(j=>heard[j]).length>=3;
   // Every note sits on a beat, or a step of one, and on the real sound there;
   // calm bars thin out, peak bars add off-beats, so the chart rises and falls with the song.
+  // A planned beat is not skipped while the beat goes on: with no clear hit on
+  // it, the note goes right on the beat, so the taps keep the song's pulse.
   const picked=[];
   beats.forEach((time,k)=>{
-    const level=levels[k], [every,steps]=plan[level], bar=((k-downbeat)%4+4)%4;
-    if(bar%every)return;
+    const level=levels[k], [plain,steps]=plan[level], bar=((k-downbeat)%4+4)%4, every=easy&&plain*beat<gap?2*plain:plain;
+    if(((k-downbeat)%every+every)%every)return;
     const span=(beats[k+1]??time+beat)-time;
     for(let step=0;step<steps;step++){
       const slot=time+span*step/steps, onBeat=step===0;
       let event=near(slot,onBeat?Math.max(.04,Math.min(.07,beat*.12)):Math.min(.05,span/steps*.3));
-      // A soft beat inside a steady groove still gets its note, right on the beat.
-      if(!event&&onBeat&&level>0&&steady(k))event={time:slot,strength:0,band:1,sustain:0};
+      if(!event&&onBeat&&steady(k))event={time:slot,strength:0,band:1,sustain:0};
       if(!event||event.time<.04||event.time>end)continue;
       if(steps===4&&step%2&&event.strength<(hard&&level===2?accent:sharp))continue;
+      // Between the beats, Normal only takes the strong hits.
+      if(!hard&&!onBeat&&event.strength<sharp)continue;
       const last=picked.at(-1);
       if(last&&(event===last.event||event.time-last.event.time<gap))continue;
       picked.push({event,k,bar,level,onBeat});
