@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {analyzePcm,makeAudioChart,beatMap,spectralFlux,ANALYSIS_VERSION} from '../dist/beat-analysis.js';
+import {analyzePcm,makeAudioChart,beatMap,spectralFlux,rephase,ANALYSIS_VERSION} from '../dist/beat-analysis.js';
 import {SONG_LIMIT} from '../dist/engine.js';
 // Playable on a phone: lanes in range, nothing past the end, no lane reused within
 // .18 s of its last note ending, at most two lanes at once (never on Chill), and
@@ -201,4 +201,18 @@ test('songs that ship with the game have their audio, a current analysis, and pl
     assert.equal(song.analysis.version,ANALYSIS_VERSION,song.id+' analysed by an older version; run node scripts/bundle-songs.mjs');
     for(const difficulty of ['easy','normal','hard']){const chart=makeAudioChart(song.analysis,difficulty);assert.ok(chart.length>song.duration*.5,song.id+' '+difficulty+' notes: '+chart.length);assertPlayable(chart,song.analysis,difficulty);}
   }
+});
+
+test('a stretch where the hits land between the beats moves over by half a beat, and the bars stay in place',()=>{
+  const beat=.5, beats=Array.from({length:64},(_,k)=>k*beat);
+  // Hits on the beat, then 24 beats where they all fall halfway between, then back on the beat.
+  const events=beats.map((time,k)=>({time:k>=20&&k<44?time+beat/2:time,strength:1,band:0}));
+  const moved=rephase(beats,events,beat);
+  assert.equal(moved.length,beats.length);
+  const onHit=moved.filter(t=>events.some(e=>Math.abs(e.time-t)<.03)).length;
+  assert.ok(onHit>=60,`${onHit} of 64 beats on a hit`);
+  assert.deepEqual(moved.slice(0,18),beats.slice(0,18));
+  assert.deepEqual(moved.slice(48),beats.slice(48));
+  // A grid already on the hits is left alone.
+  assert.deepEqual(rephase(beats,beats.map(time=>({time,strength:1,band:0})),beat),beats);
 });

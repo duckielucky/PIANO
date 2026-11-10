@@ -1,6 +1,6 @@
 // Audio-derived onsets, not a fixed/random chart. Runs in a worker in the browser.
 // Saved songs analysed by an older version are analysed again when picked.
-export const ANALYSIS_VERSION=3;
+export const ANALYSIS_VERSION=4;
 export function analyzePcm(channels, sampleRate, onProgress = () => {}) {
   const length=channels[0]?.length||0, hop=Math.max(1,Math.round(sampleRate*.01));
   const frameCount=Math.ceil(length/hop), dt=hop/sampleRate;
@@ -75,7 +75,7 @@ export function analyzePcm(channels, sampleRate, onProgress = () => {}) {
   const pulse=pulseBeats(spectralFlux(channels,sampleRate,p=>onProgress(.45+.35*p))), near=nearFinder(events);
   const gaps=pulse.beats.map(time=>near(time,.06)?.time-time).filter(Number.isFinite).sort((a,b)=>a-b);
   const shift=Math.max(-.04,Math.min(.04,gaps[gaps.length>>1]??0));
-  const beats=pulse.beats.map(time=>Math.round((time+shift)*1000)/1000).filter(time=>time>=0&&time<duration);
+  const beats=rephase(pulse.beats.map(time=>Math.round((time+shift)*1000)/1000).filter(time=>time>=0&&time<duration),events,60/pulse.bpm);
   // The tempo shown for the song is the one its notes follow.
   const tempo=pulse.bpm;bpm=Math.round(tempo);
   const melody=melodyTrack(channels,sampleRate,p=>onProgress(.8+.17*p));
@@ -173,7 +173,8 @@ export function pulseBeats(pulse){
   // beat one period earlier, penalised for stretching or squeezing the period.
   const sigma=period/32,width=Math.ceil(3*sigma),local=new Float64Array(n);
   for(let i=0;i<n;i++){let sum=0;for(let j=-width;j<=width;j++){const q=i+j;if(q>=0&&q<n)sum+=env[q]*Math.exp(-.5*(j/sigma)**2);}local[i]=sum;}
-  const tight=1000,best=new Float64Array(n),back=new Int32Array(n).fill(-1);
+  // Stiff enough that the beat holds its tempo through a fill instead of drifting off the kick.
+  const tight=3000,best=new Float64Array(n),back=new Int32Array(n).fill(-1);
   for(let i=0;i<n;i++){
     let top=0,from=-1;
     for(let j=Math.max(0,Math.round(i-2*period));j<=Math.round(i-period/2);j++){const v=best[j]-tight*Math.log((i-j)/period)**2;if(v>top){top=v;from=j;}}
@@ -313,6 +314,28 @@ export function trackBeats(analysis){
 }
 
 // Events are in time order, so a binary search finds the first one at or after a time.
+// A stretch where the song's hits keep landing halfway between the beats (the
+// beat tracker locked onto the off-beat after a break) moves over by half a
+// beat. Bass hits count a little more, since the kick marks the beat. Only a
+// clear, lasting difference counts: at least 8 beats, 1.3 times as many hits.
+// The beat count stays the same, so the bars line up as before.
+export function rephase(beats,events,beat){
+  const fit=t=>{let v=0;for(let i=firstFrom(events,t-.06);i<events.length&&events[i].time<=t+.06;i++){const e=events[i];v+=e.strength*(e.band===0?1.5:1)*Math.exp(-.5*((e.time-t)/.025)**2);}return v;};
+  const mid=k=>beats[k]+((beats[k+1]??beats[k]+beat)-beats[k])/2;
+  const on=beats.map(fit), off=beats.map((_,k)=>fit(mid(k))), reach=8;
+  const flip=beats.map((_,k)=>{let a=0,b=0;for(let j=Math.max(0,k-reach);j<=Math.min(beats.length-1,k+reach);j++){a+=on[j];b+=off[j];}return b>0&&b>1.3*a;});
+  for(let k=0;k<flip.length;){let j=k;while(j<flip.length&&flip[j]===flip[k])j++;if(flip[k]&&j-k<reach)flip.fill(false,k,j);k=j;}
+  if(!flip.includes(true))return beats;
+  // Moving over leaves a beat and a half at the start of the stretch, filled
+  // with one beat, and half a beat at its end, where the next beat goes.
+  const out=[], at=t=>out.push(Math.round(t*1000)/1000);let filled=false;
+  beats.forEach((time,k)=>{
+    if(flip[k]&&!flip[k-1]){filled=k>0;if(filled)at((beats[k-1]+mid(k))/2);}
+    if(!flip[k]&&flip[k-1]&&filled)return;
+    at(flip[k]?mid(k):time);
+  });
+  return out;
+}
 function firstFrom(events,time){let lo=0,hi=events.length;while(lo<hi){const mid=(lo+hi)>>1;if(events[mid].time<time)lo=mid+1;else hi=mid;}return lo;}
 // The real sound that marks a moment: the strongest attack within a short window of it.
 function nearFinder(events){
