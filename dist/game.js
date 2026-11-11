@@ -1,6 +1,6 @@
 import { TRACKS, makeChart, trackMap, gradeTiming, gradeAccuracy, Run, syncStep, SYNC_RANGE, SONG_LIMIT, SONG_FADE, limitChart } from './engine.js?v=0179fa5608';
 import { Soundtrack } from './audio.js?v=71f0749461';
-import { makeAudioChart, beatMap } from './beat-analysis.js?v=ba5a5c5fde';
+import { makeAudioChart, beatMap } from './beat-analysis.js?v=95db1b40a0';
 import { chooseLanguage, translate } from './i18n.js?v=b92f29ccaf';
 import { SONGS } from './songs.js?v=efe64b43a1';
 
@@ -25,7 +25,9 @@ function prepare(item){
   return item.loading;
 }
 // The song's key: found in a recorded song's sound; the original tracks are written in a minor key on their root note.
-const keyText=item=>{const key=item.recorded?item.analysis?.key:{name:['C','C#','D','Eb','E','F','F#','G','Ab','A','Bb','B'][item.root%12],mode:'minor'};return key?t(key.mode==='major'?'keyMajor':'keyMinor',{note:key.name.replace('#','♯').replace(/(?<=.)b/,'♭')}):'';};
+// A recorded song shows its key only when its notes fit that key clearly (fit .75 or more): checked
+// against essentia, every clear key was right, while songs with mixed or borrowed chords read low.
+const keyText=item=>{const key=item.recorded?(item.analysis?.key?.fit>=.75?item.analysis.key:null):{name:['C','C#','D','Eb','E','F','F#','G','Ab','A','Bb','B'][item.root%12],mode:'minor'};return key?t(key.mode==='major'?'keyMajor':'keyMinor',{note:key.name.replace('#','♯').replace(/(?<=.)b/,'♭')}):'';};
 const songFacts=(item,seconds)=>[item.recorded?t('estimatedBpm',{bpm:item.bpm}):item.bpm+' BPM',keyText(item),clockText(seconds)].filter(Boolean).join(' · ');
 const clockText=seconds=>{const total=Math.round(seconds);return `${Math.floor(total/60).toString().padStart(2,'0')}:${(total%60).toString().padStart(2,'0')}`;};
 function songCard(item){

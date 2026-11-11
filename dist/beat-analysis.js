@@ -313,7 +313,6 @@ export function trackBeats(analysis){
   return pulseBeats(env);
 }
 
-// Events are in time order, so a binary search finds the first one at or after a time.
 // A stretch where the song's hits keep landing halfway between the beats (the
 // beat tracker locked onto the off-beat after a break) moves over by half a
 // beat. Bass hits count a little more, since the kick marks the beat. Only a
@@ -336,6 +335,7 @@ export function rephase(beats,events,beat){
   });
   return out;
 }
+// Events are in time order, so a binary search finds the first one at or after a time.
 function firstFrom(events,time){let lo=0,hi=events.length;while(lo<hi){const mid=(lo+hi)>>1;if(events[mid].time<time)lo=mid+1;else hi=mid;}return lo;}
 // The real sound that marks a moment: the strongest attack within a short window of it.
 function nearFinder(events){
