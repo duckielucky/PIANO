@@ -37,11 +37,11 @@ function songCard(item){
 function songMenuContent(){
   return `<h2>${t('chooseTrack')}</h2><p class="setup-intro">${t('chooseTrackHint')}</p><div class="song-grid">${builtInTracks.map(songCard).join('')}</div>`;
 }
-// Picking a song plays its preview while the difficulty is chosen: from the
+// The PREVIEW button on the difficulty screen plays the song (it is off until tapped): from the
 // loudest 20 seconds of a recorded song (a quiet intro is skipped), starting on a bar,
-// from the start of an original track. The button stops and restarts it.
+// from the start of an original track. Tapping it again stops it.
 const PREVIEW_LENGTH=20;
-let previewOn=true;
+let previewOn=false;
 function previewStart(item){
   if(!item.recorded)return 0;
   if(item.previewAt===undefined){
@@ -450,14 +450,12 @@ function goHome(){
   session++;audio.stop();closeModal();setMode('menu');run=null;keys.clear();pointers.clear();$('#countdown').hidden=true;$('#comboBox').classList.remove('visible');$('#judgment').classList.remove('show');$('#pauseButton').disabled=true;$('#nextTrack').hidden=false;$('#trackButton').disabled=false;$('#playingBars').hidden=true;$('#playingBars').classList.remove('paused-bars');$('#score').textContent='0000000';$('#energyFill').style.width='100%';$('#energyFill').style.background='var(--brand-gradient)';$('#judgment').textContent='';delete $('#judgment').dataset.result;$('#energyText').textContent='100%';$('#songProgress').style.width='0%';$('#best').textContent=format(readBest());
   trackMenu();
 }
-const RESULT_TIME=3;
 function finish(reason='complete'){
   if(mode==='results')return;setMode('results');audio.stop();$('#pauseButton').disabled=true;$('#playingBars').hidden=true;$('#comboBox').classList.remove('visible');
   const prev=readBest(),newBest=run.score>prev;if(newBest)saveBest(run.score);$('#best').textContent=format(readBest());
   const accuracy=run.accuracy,grade=gradeAccuracy(accuracy);
   lastResult={reason,newBest,accuracy,grade};showDialog('results');
-  // The result stays up for three seconds, then the song list comes back; Play again still works meanwhile.
-  const shown=session;setTimeout(()=>{if(mode==='results'&&session===shown)goHome();},RESULT_TIME*1000);
+  // The result stays up until the player picks Play again or Change song.
 }
 function closeModal(){
   audio.stopClicks();audio.stopPreview();
@@ -493,7 +491,7 @@ function renderDialog(){
   if(dialogType==='sync')content=`<h2>${t('syncTitle')}</h2><p class="sync-intro">${t('syncIntro')}</p><canvas class="sync-canvas" role="button" aria-label="${t('syncCanvas')}"></canvas><output class="sync-taps" role="status">${syncTapText()}</output>${syncRow()}<button class="primary-button" data-action="sync-done">${t('done')}</button>`;
   if(dialogType==='results'&&lastResult){
     const {reason,newBest,accuracy,grade}=lastResult;
-    content=`<div class="eyebrow">${t(reason==='complete'?'complete':'outOfEnergy')}</div><h2>${t(reason==='complete'?'niceFlow':'tryAgain')}</h2><div class="result-grade">${grade}</div><div class="result-score">${format(run.score)}</div><div class="result-best">${newBest?'↗ '+t('newBest'):escapeHtml(trackTitle(track))}</div><div class="result-stats"><div><strong>${accuracy.toFixed(1)}%</strong><span>${t('accuracy')}</span></div><div><strong>${run.maxCombo}</strong><span>${t('maxCombo')}</span></div></div><div class="result-breakdown"><span>${run.counts.perfect} ${t('perfect')}</span><span>${run.counts.great+run.counts.good} ${t('goodGreat')}</span><span>${run.counts.miss} ${t('miss')}</span></div><button class="primary-button" data-action="restart">${t('playAgain')} <span>↗</span></button><button class="secondary-button" data-action="back-songs">${t('changeTrackAction')}</button><div class="result-timer" style="animation-duration:${RESULT_TIME}s" aria-hidden="true"></div>`;
+    content=`<div class="eyebrow">${t(reason==='complete'?'complete':'outOfEnergy')}</div><h2>${t(reason==='complete'?'niceFlow':'tryAgain')}</h2><div class="result-grade">${grade}</div><div class="result-score">${format(run.score)}</div><div class="result-best">${newBest?'↗ '+t('newBest'):escapeHtml(trackTitle(track))}</div><div class="result-stats"><div><strong>${accuracy.toFixed(1)}%</strong><span>${t('accuracy')}</span></div><div><strong>${run.maxCombo}</strong><span>${t('maxCombo')}</span></div></div><div class="result-breakdown"><span>${run.counts.perfect} ${t('perfect')}</span><span>${run.counts.great+run.counts.good} ${t('goodGreat')}</span><span>${run.counts.miss} ${t('miss')}</span></div><button class="primary-button" data-action="restart">${t('playAgain')} <span>↗</span></button><button class="secondary-button" data-action="back-songs">${t('changeTrackAction')}</button>`;
   }
   const setup=dialogType==='tracks'||dialogType==='difficulty';
   const toolbar=setup?`<div class="setup-toolbar"><button class="setup-back" data-action="${dialogType==='tracks'?'close':'back-songs'}">← ${t('back')}</button><nav class="setup-steps" aria-label="${t('setupProgress')}"><span ${dialogType==='tracks'?'aria-current="step"':''}>${t('songStep')}</span><i aria-hidden="true">/</i><span ${dialogType==='difficulty'?'aria-current="step"':''}>${t('difficultyStep')}</span></nav><button class="language-button" data-language-toggle></button></div>`:`<div class="dialog-language"><button class="language-button" data-language-toggle></button></div>`;
@@ -510,7 +508,7 @@ $('#modalContent').addEventListener('click',e=>{
   const id=e.target.closest('[data-track]')?.dataset.track;
   if(id){
     const item=builtInTracks.find(entry=>entry.id===id);
-    setTrack(item);prepare(item).catch(()=>{});showDialog('difficulty');
+    setTrack(item);previewOn=false;prepare(item).catch(()=>{});showDialog('difficulty');
   }
   const sync=e.target.closest('[data-sync]')?.dataset.sync;
   if(sync){setSync(audio.offset+Number(sync)*.01);$('#modalContent .sync-row output').textContent=syncText();return;}

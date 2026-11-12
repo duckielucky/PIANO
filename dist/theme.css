@@ -194,8 +194,6 @@ dialog[data-dialog="pause"] .sync-row+.sync-row{margin-top:-4px}
 dialog[data-dialog="sync"] .sync-row{margin-bottom:12px}
 @media(orientation:landscape) and (max-height:540px){.sync-canvas{height:96px}.sync-intro{margin:2px 0 6px;font-size:11px}}
 /* Results: a bar runs down for the three seconds before the song list comes back. */
-.result-timer{height:3px;margin-top:14px;border-radius:3px;background:var(--brand-gradient);transform-origin:left;animation:result-timer linear forwards}
-@keyframes result-timer{to{transform:scaleX(0)}}
 /* Pause: change difficulty, which starts the song again. */
 dialog .pause-label{margin:0 0 7px;font-size:10px;letter-spacing:.6px;color:#bba6d3;text-align:center}
 dialog .difficulty-selector{margin-bottom:6px}
