@@ -220,3 +220,6 @@ dialog .difficulty-selector button{min-height:38px;font-size:11px;letter-spacing
 .song-group:first-of-type{margin-top:6px}
 /* The same 返回 on the full-screen layers (start screen, rotate prompt), top-left above them. */
 .overlay-back{position:absolute;top:max(14px,env(safe-area-inset-top));left:max(14px,env(safe-area-inset-left));z-index:5;margin:0}
+/* Pause / results on vipermix.cc: 退出游戏 at the top-left of the dialog, opposite 中文, visible without scrolling. */
+.dialog-language.with-leave{justify-content:space-between;align-items:center}
+.dialog-language .setup-back{font-size:12px;padding:7px 2px}
