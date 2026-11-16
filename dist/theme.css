@@ -214,5 +214,7 @@ dialog .difficulty-selector button{min-height:38px;font-size:11px;letter-spacing
 .site-back{display:inline-flex;align-items:center;gap:2px;margin-right:10px;padding:6px 12px 6px 8px;min-height:36px;border-radius:999px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.06);color:#ece8f5;font-size:13px;font-weight:600;text-decoration:none;-webkit-tap-highlight-color:transparent}
 .site-back[hidden]{display:none}
 .site-back svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+/* Narrow phones: the arrow alone (the label stays for screen readers), so the logo keeps its room. */
+@media (max-width:480px){.site-back{padding:6px;margin-right:6px;min-width:36px;justify-content:center}.site-back span{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}}
 .song-group{margin:18px 0 8px;font-size:12px;letter-spacing:.12em;color:#9d93bd}
 .song-group:first-of-type{margin-top:6px}
