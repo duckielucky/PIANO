@@ -1,8 +1,9 @@
-import { TRACKS, makeChart, trackMap, gradeTiming, gradeAccuracy, Run, syncStep, SYNC_RANGE, SONG_LIMIT, SONG_FADE, limitChart } from './engine.js?v=0179fa5608';
+import { TRACKS, makeChart, trackMap, gradeTiming, gradeAccuracy, Run, syncStep, SYNC_RANGE, SONG_LIMIT, SONG_FADE, limitChart } from './engine.js?v=7faa7e3220';
 import { Soundtrack } from './audio.js?v=71f0749461';
 import { makeAudioChart, beatMap } from './beat-analysis.js?v=95db1b40a0';
-import { chooseLanguage, translate } from './i18n.js?v=b92f29ccaf';
+import { chooseLanguage, translate } from './i18n.js?v=20ab95ed0e';
 import { SONGS } from './songs.js?v=efe64b43a1';
+import { loadMemberSongs, loadChart } from './member-songs.js?v=66180dbedc';
 
 const $ = s => document.querySelector(s);
 const canvas=$('#canvas'), stage=$('#stage'), modal=$('#modal');
@@ -17,25 +18,31 @@ const escapeHtml=value=>String(value).replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'
 // Recorded songs ship with the game: real audio and a beat analysis, made ahead of time.
 const recordedTracks=SONGS.map(song=>({...song,url:new URL(song.file,import.meta.url).href,buffer:null,recorded:true}));
 const builtInTracks=[...recordedTracks,...TRACKS];
+// On vipermix.cc the player's own songs (bought, claimed or uploaded) come first; elsewhere there are none.
+let memberTracks=[];
+const allTracks=()=>[...memberTracks,...builtInTracks];
 // Only the chosen song keeps decoded audio in memory; the others load from the site again when picked.
-function keepBuffer(item){recordedTracks.forEach(other=>{if(other!==item)other.buffer=null;});}
+function keepBuffer(item){[...recordedTracks,...memberTracks].forEach(other=>{if(other!==item)other.buffer=null;});}
 function prepare(item){
   if(!item.recorded||item.buffer)return Promise.resolve();
-  item.loading??=fetch(item.url).then(response=>{if(!response.ok)throw new Error('decodeError');return response.arrayBuffer();}).then(bytes=>audio.decode(bytes)).then(buffer=>{keepBuffer(item);item.buffer=buffer;}).finally(()=>{item.loading=null;});
+  // A member song asks for its first ~3 minutes only (range), so a long song never fills a phone's memory.
+  item.loading??=fetch(item.url,item.range?{headers:{Range:item.range}}:undefined).then(response=>{if(!response.ok)throw new Error('decodeError');return response.arrayBuffer();}).then(bytes=>audio.decode(bytes)).then(buffer=>{keepBuffer(item);item.buffer=buffer;}).finally(()=>{item.loading=null;});
   return item.loading;
 }
 // The song's key: found in a recorded song's sound; the original tracks are written in a minor key on their root note.
 // A recorded song shows its key only when its notes fit that key clearly (fit .75 or more): checked
 // against essentia, every clear key was right, while songs with mixed or borrowed chords read low.
 const keyText=item=>{const key=item.recorded?(item.analysis?.key?.fit>=.75?item.analysis.key:null):{name:['C','C#','D','Eb','E','F','F#','G','Ab','A','Bb','B'][item.root%12],mode:'minor'};return key?t(key.mode==='major'?'keyMajor':'keyMinor',{note:key.name.replace('#','♯').replace(/(?<=.)b/,'♭')}):'';};
-const songFacts=(item,seconds)=>[item.recorded?t('estimatedBpm',{bpm:item.bpm}):item.bpm+' BPM',keyText(item),clockText(seconds)].filter(Boolean).join(' · ');
+const songFacts=(item,seconds)=>[item.member?escapeHtml(item.artist):'',item.recorded?(item.bpm?t('estimatedBpm',{bpm:item.bpm}):''):item.bpm+' BPM',keyText(item),clockText(seconds)].filter(Boolean).join(' · ');
 const clockText=seconds=>{const total=Math.round(seconds);return `${Math.floor(total/60).toString().padStart(2,'0')}:${(total%60).toString().padStart(2,'0')}`;};
 function songCard(item){
   const card=`<button class="track-choice song-card ${item===track?'selected':''}" data-track="${item.id}" aria-pressed="${item===track}"><span class="song-symbol" aria-hidden="true">♫</span><span class="song-copy"><strong>${escapeHtml(trackTitle(item))}</strong><small>${songFacts(item,Math.min(SONG_LIMIT,item.duration??item.bars*4*60/item.bpm))}</small></span><span class="song-chevron" aria-hidden="true">→</span></button>`;
   return card;
 }
 function songMenuContent(){
-  return `<h2>${t('chooseTrack')}</h2><p class="setup-intro">${t('chooseTrackHint')}</p><div class="song-grid">${builtInTracks.map(songCard).join('')}</div>`;
+  const grid=list=>`<div class="song-grid">${list.map(songCard).join('')}</div>`;
+  const songs=memberTracks.length?`<h3 class="song-group">${t('mySongs')}</h3>${grid(memberTracks)}<h3 class="song-group">${t('builtInSongs')}</h3>${grid(builtInTracks)}`:grid(builtInTracks);
+  return `<h2>${t('chooseTrack')}</h2><p class="setup-intro">${t('chooseTrackHint')}</p>${songs}`;
 }
 // The PREVIEW button on the difficulty screen plays the song (it is off until tapped): from the
 // loudest 20 seconds of a recorded song (a quiet intro is skipped), starting on a bar,
@@ -476,6 +483,7 @@ function dismiss(){
 }
 function backDialog(){
   if(dialogType==='sync')showDialog('difficulty');
+  else if(dialogType==='analysing'||dialogType==='unavailable')backToSongs();
   else if(dialogType==='difficulty')backToSongs();
   else if(dialogType==='results')goHome();
   else dismiss();
@@ -487,6 +495,8 @@ function renderDialog(){
   if(dialogType==='pause')content=`<h2><em>${t('paused')}</em></h2>${pauseDifficulty()}${syncRow()}<button class="primary-button" data-action="resume">${t('resume')} <span>▶</span></button><button class="secondary-button" data-action="restart">${t('restart')}</button><button class="secondary-button" data-action="home">${t('changeSong')}</button>`;
   if(dialogType==='help')content=`<h2>${t('tap')} <em>+ ${t('hold')}</em></h2><div class="tutorial-row"><div class="note-demo"><span class="note-icon tap"></span></div><div><strong>${t('tap')}</strong><p>${t('tapHelp')}</p></div></div><div class="tutorial-row"><div class="note-demo"><span class="note-icon hold"></span></div><div><strong>${t('hold')}</strong><p>${t('holdHelp')}</p></div></div><p class="key-hint">${t('keyboardHelp')}</p><button class="primary-button" data-action="close">${t('gotIt')}</button>`;
   if(dialogType==='tracks')content=songMenuContent();
+  if(dialogType==='analysing')content=`<div class="eyebrow">${escapeHtml(trackTitle(track))}</div><h2>${t('analysing')}</h2><p>${t('analysingHint')}</p><button class="secondary-button" data-action="back-songs">${t('back')}</button>`;
+  if(dialogType==='unavailable')content=`<div class="eyebrow">${escapeHtml(trackTitle(track))}</div><h2>${t('songNotReady')}</h2><p>${t('songNotReadyHint')}</p><button class="primary-button" data-action="back-songs">${t('back')}</button>`;
   if(dialogType==='difficulty')content=difficultyContent();
   if(dialogType==='sync')content=`<h2>${t('syncTitle')}</h2><p class="sync-intro">${t('syncIntro')}</p><canvas class="sync-canvas" role="button" aria-label="${t('syncCanvas')}"></canvas><output class="sync-taps" role="status">${syncTapText()}</output>${syncRow()}<button class="primary-button" data-action="sync-done">${t('done')}</button>`;
   if(dialogType==='results'&&lastResult){
@@ -507,8 +517,14 @@ $('#modalContent').addEventListener('click',e=>{
   if(action==='close')dismiss();if(action==='resume')resume();if(action==='restart')start();if(action==='home')goHome();
   const id=e.target.closest('[data-track]')?.dataset.track;
   if(id){
-    const item=builtInTracks.find(entry=>entry.id===id);
-    setTrack(item);previewOn=false;prepare(item).catch(()=>{});showDialog('difficulty');
+    const item=allTracks().find(entry=>entry.id===id);
+    setTrack(item);previewOn=false;
+    // A member song needs its chart from the server first (made by this game's analyser).
+    if(item.member&&!item.analysis){
+      showDialog('analysing');
+      loadChart(item).then(()=>{if(track!==item||dialogType!=='analysing')return;setTrack(item);prepare(item).catch(()=>{});showDialog('difficulty');})
+        .catch(()=>{if(track===item&&dialogType==='analysing')showDialog('unavailable');});
+    }else{prepare(item).catch(()=>{});showDialog('difficulty');}
   }
   const sync=e.target.closest('[data-sync]')?.dataset.sync;
   if(sync){setSync(audio.offset+Number(sync)*.01);$('#modalContent .sync-row output').textContent=syncText();return;}
@@ -527,6 +543,13 @@ async function enterFullscreen(){
 }
 function leaveStart(){const screen=$('#startScreen');if(!screen||screen.hidden)return;screen.classList.add('leaving');document.body.classList.remove('at-start');startTimer=setTimeout(()=>{screen.hidden=true;},350);enterFullscreen().then(trackMenu);}
 function showStart(){clearTimeout(startTimer);closeModal();const screen=$('#startScreen');screen.hidden=false;screen.classList.remove('leaving');document.body.classList.add('at-start');$('#startButton').focus({preventScroll:true});}
+// On vipermix.cc (/game/) a 返回 link goes back to the page the player came from.
+const siteBack=$('#siteBack');
+if(siteBack&&location.pathname.startsWith('/game')){
+  siteBack.hidden=false;
+  siteBack.addEventListener('click',e=>{try{if(document.referrer&&new URL(document.referrer).origin===location.origin&&history.length>1){e.preventDefault();history.back();}}catch{}});
+}
+loadMemberSongs().then(list=>{memberTracks=list;if(dialogType==='tracks'&&modal.open)renderDialog();}).catch(()=>{});
 document.body.classList.add('at-start');$('#startButton').addEventListener('click',leaveStart);$('#startButton').focus({preventScroll:true});
 $('#pauseButton').addEventListener('click',pause);$('#helpButton').addEventListener('click',help);$('#trackButton').addEventListener('click',trackMenu);
 $('#soundButton').addEventListener('click',()=>{audio.setMuted(!audio.muted);syncSoundLabel();$('#soundButton').style.color=audio.muted?'#ff7b9f':'';$('#soundButton').innerHTML=audio.muted?'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m11 5-6 4H2v6h3l6 4zM16 9l6 6M22 9l-6 6"/></svg>':'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m11 5-6 4H2v6h3l6 4zM15 8a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14"/></svg>';});

@@ -128,10 +128,11 @@ test('every element the game looks up by id is on the page',()=>{
   assert.ok(wanted.length>15);
   for(const id of wanted)assert.ok(ids.has(id),'#'+id+' is missing from index.html');
 });
-test('a round stops at two minutes: no note ends inside the final fade',()=>{
-  const notes=[{time:10,lane:0},{time:118,lane:1},{time:119,lane:2},{time:117,lane:3,duration:2},{time:130,lane:0}];
+test('a round stops at three minutes: no note ends inside the final fade',()=>{
+  assert.equal(SONG_LIMIT,180);
+  const notes=[{time:10,lane:0},{time:178,lane:1},{time:179,lane:2},{time:177,lane:3,duration:2},{time:190,lane:0}];
   const kept=limitChart(notes,SONG_LIMIT);
-  assert.deepEqual(kept.map(n=>n.time),[10,118]);
+  assert.deepEqual(kept.map(n=>n.time),[10,178]);
   assert.ok(kept.every(n=>n.time+(n.duration||0)<=SONG_LIMIT-SONG_FADE/2));
   assert.equal(limitChart(notes,60).length,1);
 });

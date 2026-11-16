@@ -13,6 +13,7 @@ Open http://localhost:5186. On a phone on the same Wi-Fi, use your computer's LA
 - Touch: tap a lane at the glowing line; hold purple notes until their tail arrives.
 - Keyboard: **D F J K**. Keep the lane key pressed for purple holds.
 - **Esc** pauses. Switching tabs automatically pauses the track.
+- Rounds last up to three minutes; a longer song fades out at 3:00.
 - Three original procedural soundtracks, three difficulty levels, local personal bests, results, and replay.
 - All modes use taps and holds only. Chill is the default, with slower notes, half as many notes as before, one-beat holds, generous timing, and no game over. The starting track is the slower Afterglow.
 - Scores use a separate tap-and-hold record so old, denser charts do not set an unreachable personal best.
@@ -46,3 +47,16 @@ The original decoded audio and notes share the Web Audio clock, including pause/
 ## Cloudflare Pages
 
 For GitHub integration, use framework preset **None**, build command `exit 0`, build output directory `dist`, and leave the root directory blank. For manual upload, upload the contents of `dist` or the prepared Cloudflare ZIP, with `index.html` directly at the archive root. Publishing the repository root places the game under `/dist/` and leaves the homepage returning 404.
+
+## On vipermix.cc
+
+VIPERMIX serves this game at `vipermix.cc/game/` and syncs `dist/` from this repo's `main` (it runs `npm test` and `npm run check` first; a red run is not synced).
+
+- **The player's own songs.** On vipermix.cc, a logged-in member also sees **MY SONGS / 我的歌**: songs they bought, claimed or uploaded there, from `/api/game/songs` on the same site (`dist/member-songs.js`). Elsewhere (local dev, a preview host) that API isn't there and only the game's songs show. The first time a song is played its notes are worked out on VIPERMIX's server, so the game shows "Getting the notes ready…" for a few seconds; a song whose notes can't be made says so and stays unplayable. Only the first ~3 minutes of each song are downloaded.
+- **The server analyses with this repo's code.** `scripts/analyze-pcm.mjs` reads raw PCM on stdin (stereo f32le, `--rate` Hz) and prints the same `analyzePcm` JSON the built-in songs carry. It shares `scripts/pcm.mjs` (the downsample to 11025 Hz) with `bundle-songs.mjs`, so a song gets the same notes either way. VIPERMIX runs it under `node --permission` with no network: keep it to stdin/stdout, node built-ins and `dist/beat-analysis.js`. Bump `ANALYSIS_VERSION` whenever the analysis output changes, so cached charts are re-made.
+
+```sh
+ffmpeg -v error -t 180 -i song.mp3 -ac 2 -ar 44100 -f f32le - | node scripts/analyze-pcm.mjs --rate 44100
+```
+
+- **返回 / Back.** On vipermix.cc a Back link sits left of the logo and returns to the page the player came from.

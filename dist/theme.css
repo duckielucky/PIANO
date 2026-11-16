@@ -209,3 +209,10 @@ dialog .difficulty-selector button{min-height:38px;font-size:11px;letter-spacing
 .preview-toggle .playing-bars i:nth-child(2){height:12px}
 .preview-toggle .playing-bars i:nth-child(3){height:7px}
 .preview-toggle:not(.on) .playing-bars i{animation:none;transform:scaleY(.35);background:#a996c1}
+
+/* 返回 on vipermix.cc (/game/): back to the page the player came from. */
+.site-back{display:inline-flex;align-items:center;gap:2px;margin-right:10px;padding:6px 12px 6px 8px;min-height:36px;border-radius:999px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.06);color:#ece8f5;font-size:13px;font-weight:600;text-decoration:none;-webkit-tap-highlight-color:transparent}
+.site-back[hidden]{display:none}
+.site-back svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.song-group{margin:18px 0 8px;font-size:12px;letter-spacing:.12em;color:#9d93bd}
+.song-group:first-of-type{margin-top:6px}
