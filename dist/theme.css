@@ -218,3 +218,5 @@ dialog .difficulty-selector button{min-height:38px;font-size:11px;letter-spacing
 @media (max-width:480px){.site-back{padding:6px;margin-right:6px;min-width:36px;justify-content:center}.site-back span{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}}
 .song-group{margin:18px 0 8px;font-size:12px;letter-spacing:.12em;color:#9d93bd}
 .song-group:first-of-type{margin-top:6px}
+/* The same 返回 on the full-screen layers (start screen, rotate prompt), top-left above them. */
+.overlay-back{position:absolute;top:max(14px,env(safe-area-inset-top));left:max(14px,env(safe-area-inset-left));z-index:5;margin:0}
